@@ -27,7 +27,6 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 8,
     },
-    // Optionally, add fields like role, isVerified, etc.
   },
   { timestamps: true }
 );
