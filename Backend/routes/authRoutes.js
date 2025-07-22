@@ -13,6 +13,6 @@ const handleValidation = (req, res, next) => {
 };
 
 router.post('/register', registerValidation, handleValidation, authController.register);
-
+router.post('/login', loginValidation, handleValidation, authController.login);
 
 module.exports = router;
