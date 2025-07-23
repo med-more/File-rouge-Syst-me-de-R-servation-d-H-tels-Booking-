@@ -24,3 +24,15 @@ exports.updateProfile = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.getProfile = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const user = await require('../models/User').findById(userId);
+    if (!user) return res.status(404).json({ message: 'User not found' });
+    const { password, ...userData } = user.toObject();
+    res.json({ user: userData });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
