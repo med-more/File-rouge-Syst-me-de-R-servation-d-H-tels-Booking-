@@ -14,5 +14,6 @@ const handleValidation = (req, res, next) => {
 
 router.post('/register', registerValidation, handleValidation, authController.register);
 router.post('/login', loginValidation, handleValidation, authController.login);
+router.post('/logout', authController.logout);
 
 module.exports = router;
