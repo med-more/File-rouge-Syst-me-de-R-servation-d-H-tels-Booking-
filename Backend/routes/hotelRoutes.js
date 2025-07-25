@@ -15,5 +15,6 @@ const handleValidation = (req, res, next) => {
 router.post('/hotels', createHotelValidation, handleValidation, hotelController.createHotel);
 router.get('/hotels', hotelController.getHotels);
 router.get('/hotels/:id', hotelController.getHotelById);
+router.put('/hotels/:id', createHotelValidation, handleValidation, hotelController.updateHotel);
 
 module.exports = router;

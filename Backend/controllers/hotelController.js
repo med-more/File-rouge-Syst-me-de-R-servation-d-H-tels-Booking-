@@ -50,3 +50,18 @@ exports.getHotelById = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.updateHotel = async (req, res) => {
+  try {
+    const { name, location, description, pricePerNight, rating, amenities, images, rooms } = req.body;
+    const hotel = await Hotel.findByIdAndUpdate(
+      req.params.id,
+      { name, location, description, pricePerNight, rating, amenities, images, rooms },
+      { new: true, runValidators: true }
+    );
+    if (!hotel) return res.status(404).json({ message: 'Hotel not found' });
+    res.json({ hotel });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
