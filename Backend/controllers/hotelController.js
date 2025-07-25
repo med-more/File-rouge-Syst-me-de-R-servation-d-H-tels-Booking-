@@ -75,3 +75,39 @@ exports.deleteHotel = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.searchHotels = async (req, res) => {
+  try {
+    const { name, location, minPrice, maxPrice, rating, amenities, roomType, minGuests } = req.query;
+    const filter = {};
+    if (name) filter.name = { $regex: name, $options: 'i' };
+    if (location) filter.location = { $regex: location, $options: 'i' };
+    if (minPrice || maxPrice) filter.pricePerNight = {};
+    if (minPrice) filter.pricePerNight.$gte = Number(minPrice);
+    if (maxPrice) filter.pricePerNight.$lte = Number(maxPrice);
+    if (rating) filter.rating = Number(rating);
+    if (amenities) {
+      const amArr = Array.isArray(amenities) ? amenities : amenities.split(',');
+      filter.amenities = { $all: amArr };
+    }
+    if (roomType || minGuests) {
+      filter.rooms = { $elemMatch: {} };
+      if (roomType) filter.rooms.$elemMatch.type = { $regex: roomType, $options: 'i' };
+      if (minGuests) filter.rooms.$elemMatch.maxGuests = { $gte: Number(minGuests) };
+    }
+    const hotels = await Hotel.find(filter);
+    res.json({ hotels });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getHotelRooms = async (req, res) => {
+  try {
+    const hotel = await Hotel.findById(req.params.id);
+    if (!hotel) return res.status(404).json({ message: 'Hotel not found' });
+    res.json({ rooms: hotel.rooms });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

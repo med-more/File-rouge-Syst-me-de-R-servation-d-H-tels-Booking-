@@ -17,5 +17,7 @@ router.get('/hotels', hotelController.getHotels);
 router.get('/hotels/:id', hotelController.getHotelById);
 router.put('/hotels/:id', createHotelValidation, handleValidation, hotelController.updateHotel);
 router.delete('/hotels/:id', hotelController.deleteHotel);
+router.get('/hotels/search', hotelController.searchHotels);
+router.get('/hotels/:id/rooms', hotelController.getHotelRooms);
 
 module.exports = router;
