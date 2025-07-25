@@ -65,3 +65,13 @@ exports.updateHotel = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.deleteHotel = async (req, res) => {
+  try {
+    const hotel = await Hotel.findByIdAndDelete(req.params.id);
+    if (!hotel) return res.status(404).json({ message: 'Hotel not found' });
+    res.json({ message: 'Hotel deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
