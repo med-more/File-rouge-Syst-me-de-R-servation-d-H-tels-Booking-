@@ -18,5 +18,6 @@ const handleValidation = (req, res, next) => {
 router.get('/rooms', roomController.getRooms);
 router.get('/rooms/:id', roomController.getRoomById);
 router.post('/rooms', createRoomValidation, handleValidation, roomController.createRoom);
+router.put('/rooms/:id', createRoomValidation, handleValidation, roomController.updateRoom);
 
 module.exports = router; 

@@ -109,6 +109,30 @@ exports.getRoomById = async (req, res) => {
   }
 };
 
+exports.updateRoom = async (req, res) => {
+  try {
+    const room = await Room.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true, runValidators: true }
+    );
+
+    if (!room) {
+      return res.status(404).json({ message: 'Room not found' });
+    }
+
+    res.json({ 
+      message: 'Room updated successfully',
+      room 
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 exports.createRoom = async (req, res) => {
   try {
     const {
