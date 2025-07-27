@@ -1,4 +1,5 @@
 const Hotel = require('../models/Hotel');
+const Room = require('../models/Room');
 
 exports.createHotel = async (req, res) => {
   try {
@@ -104,12 +105,11 @@ exports.searchHotels = async (req, res) => {
 
 exports.getHotelRooms = async (req, res) => {
   try {
-    const Room = require('../models/Room');
-    
     const hotel = await Hotel.findById(req.params.id);
     if (!hotel) return res.status(404).json({ message: 'Hotel not found' });
     
     const rooms = await Room.find({ hotelId: req.params.id });
+    
     res.json({ rooms });
   } catch (error) {
     res.status(500).json({ message: 'Server error', error: error.message });

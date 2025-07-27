@@ -32,6 +32,21 @@ exports.createRoom = async (req, res) => {
 
     await room.save();
 
+    const roomForHotel = {
+      type,
+      description,
+      pricePerNight,
+      maxGuests,
+      quantity,
+      amenities: amenities || [],
+      images: images || []
+    };
+
+    await Hotel.findByIdAndUpdate(
+      hotelId,
+      { $push: { rooms: roomForHotel } }
+    );
+
     res.status(201).json({ 
       message: 'Room created successfully',
       room 
