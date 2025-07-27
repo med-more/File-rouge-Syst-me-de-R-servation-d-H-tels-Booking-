@@ -19,5 +19,6 @@ router.get('/rooms', roomController.getRooms);
 router.get('/rooms/:id', roomController.getRoomById);
 router.post('/rooms', createRoomValidation, handleValidation, roomController.createRoom);
 router.put('/rooms/:id', createRoomValidation, handleValidation, roomController.updateRoom);
+router.delete('/rooms/:id', roomController.deleteRoom);
 
 module.exports = router; 
