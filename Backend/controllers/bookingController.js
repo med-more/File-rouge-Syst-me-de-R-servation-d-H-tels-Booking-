@@ -2,6 +2,114 @@ const Booking = require('../models/Booking');
 const Room = require('../models/Room');
 const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
+const mongoose = require('mongoose');
+
+exports.getBookingById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await Booking.findById(id)
+      .populate('hotelId', 'name location description amenities')
+      .populate('roomId', 'type description pricePerNight maxGuests amenities images')
+      .populate('userId', 'name email phone');
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    // Debug logs
+    console.log('req.user.userId:', req.user.userId);
+    console.log('booking.userId:', booking.userId);
+    console.log('booking.userId.toString():', booking.userId.toString());
+    console.log('Types:', typeof req.user.userId, typeof booking.userId.toString());
+
+  
+    const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const bookingUserObjectId = new mongoose.Types.ObjectId(booking.userId);
+    
+    if (!userObjectId.equals(bookingUserObjectId)) {
+      return res.status(403).json({ 
+        message: 'Access denied. You can only view your own bookings.',
+        debug: {
+          reqUserId: req.user.userId,
+          bookingUserId: booking.userId.toString(),
+          userObjectId: userObjectId.toString(),
+          bookingUserObjectId: bookingUserObjectId.toString(),
+          types: {
+            reqUserId: typeof req.user.userId,
+            bookingUserId: typeof booking.userId.toString()
+          }
+        }
+      });
+    }
+
+    const now = new Date();
+    const checkInDate = new Date(booking.checkIn);
+    const checkOutDate = new Date(booking.checkOut);
+    
+    const isUpcoming = checkInDate > now;
+    const isActive = checkInDate <= now && checkOutDate > now;
+    const isPast = checkOutDate <= now;
+    const canBeCancelled = booking.canBeCancelled();
+
+    res.json({
+      booking: {
+        _id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        hotel: booking.hotelId,
+        room: booking.roomId,
+        user: booking.userId,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        numberOfNights: booking.numberOfNights,
+        guests: booking.guests,
+        guestDetails: booking.guestDetails,
+        pricePerNight: booking.pricePerNight,
+        totalPrice: booking.totalPrice,
+        taxes: booking.taxes,
+        fees: booking.fees,
+        discount: booking.discount,
+        finalPrice: booking.finalPrice,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        paymentMethod: booking.paymentMethod,
+        specialRequests: booking.specialRequests,
+        roomPreferences: booking.roomPreferences,
+        cancellationPolicy: booking.cancellationPolicy,
+        cancellationDeadline: booking.cancellationDeadline,
+        cancellationReason: booking.cancellationReason,
+        source: booking.source,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        confirmedAt: booking.confirmedAt,
+        cancelledAt: booking.cancelledAt,
+        completedAt: booking.completedAt
+      },
+      timeline: {
+        isUpcoming,
+        isActive,
+        isPast,
+        canBeCancelled,
+        daysUntilCheckIn: isUpcoming ? Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24)) : null,
+        daysUntilCheckOut: isActive ? Math.ceil((checkOutDate - now) / (1000 * 60 * 60 * 24)) : null,
+        daysSinceCheckOut: isPast ? Math.ceil((now - checkOutDate) / (1000 * 60 * 60 * 24)) : null
+      },
+      actions: {
+        canCancel: canBeCancelled,
+        canModify: booking.status === 'pending' || booking.status === 'confirmed',
+        canPay: booking.paymentStatus === 'pending',
+        canReview: isPast && booking.status === 'completed'
+      }
+    });
+
+  } catch (error) {
+    console.error('Get booking by ID error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
 
 exports.getUserBookings = async (req, res) => {
   try {

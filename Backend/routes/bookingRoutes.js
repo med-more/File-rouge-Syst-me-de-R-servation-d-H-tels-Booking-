@@ -16,6 +16,7 @@ const handleValidation = (req, res, next) => {
   next();
 };
 
+router.get('/bookings/:id', authMiddleware, bookingController.getBookingById);
 router.get('/bookings/:userId', authMiddleware, bookingController.getUserBookings);
 router.post('/bookings', authMiddleware, createBookingValidation, handleValidation, bookingController.createBooking);
 
