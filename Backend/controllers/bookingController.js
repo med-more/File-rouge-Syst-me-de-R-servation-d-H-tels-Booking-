@@ -3,6 +3,131 @@ const Room = require('../models/Room');
 const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
 
+exports.getUserBookings = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const {
+      status,
+      paymentStatus,
+      checkIn,
+      checkOut,
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    if (req.user.userId !== userId) {
+      return res.status(403).json({ message: 'Access denied. You can only view your own bookings.' });
+    }
+
+    const filter = { userId };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (paymentStatus) {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    if (checkIn || checkOut) {
+      filter.checkIn = {};
+      if (checkIn) {
+        filter.checkIn.$gte = new Date(checkIn);
+      }
+      if (checkOut) {
+        filter.checkIn.$lte = new Date(checkOut);
+      }
+    }
+
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const bookings = await Booking.find(filter)
+      .populate('hotelId', 'name location')
+      .populate('roomId', 'type description pricePerNight')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Booking.countDocuments(filter);
+
+    const totalBookings = await Booking.countDocuments({ userId });
+    const confirmedBookings = await Booking.countDocuments({ userId, status: 'confirmed' });
+    const cancelledBookings = await Booking.countDocuments({ userId, status: 'cancelled' });
+    const completedBookings = await Booking.countDocuments({ userId, status: 'completed' });
+    const pendingBookings = await Booking.countDocuments({ userId, status: 'pending' });
+
+    const totalPages = Math.ceil(total / parseInt(limit));
+    const hasNextPage = parseInt(page) < totalPages;
+    const hasPrevPage = parseInt(page) > 1;
+
+    res.json({
+      bookings: bookings.map(booking => ({
+        _id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        hotel: booking.hotelId,
+        room: booking.roomId,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        numberOfNights: booking.numberOfNights,
+        guests: booking.guests,
+        guestDetails: booking.guestDetails,
+        pricePerNight: booking.pricePerNight,
+        totalPrice: booking.totalPrice,
+        taxes: booking.taxes,
+        fees: booking.fees,
+        discount: booking.discount,
+        finalPrice: booking.finalPrice,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        paymentMethod: booking.paymentMethod,
+        specialRequests: booking.specialRequests,
+        roomPreferences: booking.roomPreferences,
+        cancellationPolicy: booking.cancellationPolicy,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        confirmedAt: booking.confirmedAt,
+        cancelledAt: booking.cancelledAt,
+        completedAt: booking.completedAt
+      })),
+      statistics: {
+        totalBookings,
+        confirmedBookings,
+        cancelledBookings,
+        completedBookings,
+        pendingBookings,
+        confirmationRate: totalBookings > 0 ? Math.round((confirmedBookings / totalBookings) * 100) : 0,
+        cancellationRate: totalBookings > 0 ? Math.round((cancelledBookings / totalBookings) * 100) : 0
+      },
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: total,
+        itemsPerPage: parseInt(limit),
+        hasNextPage,
+        hasPrevPage
+      },
+      filters: {
+        status,
+        paymentStatus,
+        checkIn,
+        checkOut
+      }
+    });
+
+  } catch (error) {
+    console.error('Get user bookings error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 exports.createBooking = async (req, res) => {
   try {
     const {
