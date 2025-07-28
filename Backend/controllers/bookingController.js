@@ -4,6 +4,151 @@ const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
 const mongoose = require('mongoose');
 
+exports.updateBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      checkIn,
+      checkOut,
+      guests,
+      guestDetails,
+      pricePerNight,
+      taxes,
+      fees,
+      discount,
+      paymentMethod,
+      specialRequests,
+      roomPreferences,
+      cancellationPolicy
+    } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const bookingUserObjectId = new mongoose.Types.ObjectId(booking.userId);
+    
+    if (!userObjectId.equals(bookingUserObjectId)) {
+      return res.status(403).json({ message: 'Access denied. You can only modify your own bookings.' });
+    }
+
+    if (booking.status === 'cancelled' || booking.status === 'completed') {
+      return res.status(400).json({ message: 'Cannot modify cancelled or completed bookings' });
+    }
+
+    if (checkIn || checkOut) {
+      const newCheckIn = checkIn ? new Date(checkIn) : booking.checkIn;
+      const newCheckOut = checkOut ? new Date(checkOut) : booking.checkOut;
+      const currentGuests = guests ? guests.adults : booking.guests.adults;
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (newCheckIn < today) {
+        return res.status(400).json({ message: 'Check-in date cannot be in the past' });
+      }
+
+      if (newCheckOut <= newCheckIn) {
+        return res.status(400).json({ message: 'Check-out date must be after check-in date' });
+      }
+
+      const availabilityCheck = await Booking.checkAvailability(
+        booking.hotelId,
+        booking.roomId,
+        newCheckIn,
+        newCheckOut,
+        currentGuests
+      );
+
+      if (!availabilityCheck.available) {
+        return res.status(400).json({ 
+          message: availabilityCheck.reason 
+        });
+      }
+    }
+
+    if (guests) {
+      const room = await Room.findById(booking.roomId);
+      if (!room) {
+        return res.status(404).json({ message: 'Room not found' });
+      }
+
+      const totalGuests = guests.adults + guests.children + guests.infants;
+      if (totalGuests > room.maxGuests) {
+        return res.status(400).json({ 
+          message: `Maximum ${room.maxGuests} guests allowed for this room type` 
+        });
+      }
+    }
+
+    const updateData = {};
+    
+    if (checkIn) updateData.checkIn = new Date(checkIn);
+    if (checkOut) updateData.checkOut = new Date(checkOut);
+    if (guests) updateData.guests = guests;
+    if (guestDetails) updateData.guestDetails = guestDetails;
+    if (pricePerNight) updateData.pricePerNight = pricePerNight;
+    if (taxes !== undefined) updateData.taxes = taxes;
+    if (fees !== undefined) updateData.fees = fees;
+    if (discount !== undefined) updateData.discount = discount;
+    if (paymentMethod) updateData.paymentMethod = paymentMethod;
+    if (specialRequests !== undefined) updateData.specialRequests = specialRequests;
+    if (roomPreferences) updateData.roomPreferences = roomPreferences;
+    if (cancellationPolicy) updateData.cancellationPolicy = cancellationPolicy;
+
+    const updatedBooking = await Booking.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    await updatedBooking.populate([
+      { path: 'hotelId', select: 'name location' },
+      { path: 'roomId', select: 'type description' },
+      { path: 'userId', select: 'name email' }
+    ]);
+
+    res.json({
+      message: 'Booking updated successfully',
+      booking: {
+        _id: updatedBooking._id,
+        bookingNumber: updatedBooking.bookingNumber,
+        hotel: updatedBooking.hotelId,
+        room: updatedBooking.roomId,
+        user: updatedBooking.userId,
+        checkIn: updatedBooking.checkIn,
+        checkOut: updatedBooking.checkOut,
+        numberOfNights: updatedBooking.numberOfNights,
+        guests: updatedBooking.guests,
+        guestDetails: updatedBooking.guestDetails,
+        pricePerNight: updatedBooking.pricePerNight,
+        totalPrice: updatedBooking.totalPrice,
+        taxes: updatedBooking.taxes,
+        fees: updatedBooking.fees,
+        discount: updatedBooking.discount,
+        finalPrice: updatedBooking.finalPrice,
+        status: updatedBooking.status,
+        paymentStatus: updatedBooking.paymentStatus,
+        paymentMethod: updatedBooking.paymentMethod,
+        specialRequests: updatedBooking.specialRequests,
+        roomPreferences: updatedBooking.roomPreferences,
+        cancellationPolicy: updatedBooking.cancellationPolicy,
+        createdAt: updatedBooking.createdAt,
+        updatedAt: updatedBooking.updatedAt
+      }
+    });
+
+  } catch (error) {
+    console.error('Update booking error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 exports.getBookingById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -17,13 +162,11 @@ exports.getBookingById = async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
 
-    // Debug logs
     console.log('req.user.userId:', req.user.userId);
     console.log('booking.userId:', booking.userId);
     console.log('booking.userId.toString():', booking.userId.toString());
     console.log('Types:', typeof req.user.userId, typeof booking.userId.toString());
 
-  
     const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
     const bookingUserObjectId = new mongoose.Types.ObjectId(booking.userId);
     
