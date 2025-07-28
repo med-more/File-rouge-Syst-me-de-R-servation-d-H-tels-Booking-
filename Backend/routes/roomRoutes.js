@@ -17,6 +17,8 @@ const handleValidation = (req, res, next) => {
 
 router.get('/rooms', roomController.getRooms);
 router.get('/rooms/:id', roomController.getRoomById);
+router.get('/rooms/:id/availability', roomController.getRoomAvailability);
+router.put('/rooms/:id/availability', roomController.upsertRoomAvailability);
 router.post('/rooms', createRoomValidation, handleValidation, roomController.createRoom);
 router.put('/rooms/:id', createRoomValidation, handleValidation, roomController.updateRoom);
 router.delete('/rooms/:id', roomController.deleteRoom);
