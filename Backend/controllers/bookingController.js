@@ -4,6 +4,130 @@ const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
 const mongoose = require('mongoose');
 
+exports.confirmBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { confirmationNotes } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ message: 'Cannot confirm a cancelled booking' });
+    }
+
+    if (booking.status === 'completed') {
+      return res.status(400).json({ message: 'Cannot confirm a completed booking' });
+    }
+
+    if (booking.status === 'confirmed') {
+      return res.status(400).json({ message: 'Booking is already confirmed' });
+    }
+
+    const hotel = await Hotel.findById(booking.hotelId);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    const availabilityCheck = await Booking.checkAvailability(
+      booking.hotelId,
+      booking.roomId,
+      booking.checkIn,
+      booking.checkOut,
+      booking.guests.adults
+    );
+
+    if (!availabilityCheck.available) {
+      return res.status(400).json({ 
+        message: 'Cannot confirm booking - insufficient availability',
+        reason: availabilityCheck.reason
+      });
+    }
+
+    const updateData = {
+      status: 'confirmed',
+      confirmedAt: new Date()
+    };
+
+    if (confirmationNotes) {
+      updateData.confirmationNotes = confirmationNotes;
+    }
+
+    const confirmedBooking = await Booking.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (booking.status === 'pending') {
+      try {
+        await Availability.bookPeriod(
+          booking.hotelId,
+          booking.roomId,
+          booking.checkIn,
+          booking.checkOut,
+          booking.guests.adults
+        );
+      } catch (error) {
+        console.error('Error updating availability:', error);
+      }
+    }
+
+    await confirmedBooking.populate([
+      { path: 'hotelId', select: 'name location' },
+      { path: 'roomId', select: 'type description' },
+      { path: 'userId', select: 'name email' }
+    ]);
+
+    res.json({
+      message: 'Booking confirmed successfully',
+      booking: {
+        _id: confirmedBooking._id,
+        bookingNumber: confirmedBooking.bookingNumber,
+        hotel: confirmedBooking.hotelId,
+        room: confirmedBooking.roomId,
+        user: confirmedBooking.userId,
+        checkIn: confirmedBooking.checkIn,
+        checkOut: confirmedBooking.checkOut,
+        numberOfNights: confirmedBooking.numberOfNights,
+        guests: confirmedBooking.guests,
+        guestDetails: confirmedBooking.guestDetails,
+        pricePerNight: confirmedBooking.pricePerNight,
+        totalPrice: confirmedBooking.totalPrice,
+        taxes: confirmedBooking.taxes,
+        fees: confirmedBooking.fees,
+        discount: confirmedBooking.discount,
+        finalPrice: confirmedBooking.finalPrice,
+        status: confirmedBooking.status,
+        paymentStatus: confirmedBooking.paymentStatus,
+        paymentMethod: confirmedBooking.paymentMethod,
+        specialRequests: confirmedBooking.specialRequests,
+        roomPreferences: confirmedBooking.roomPreferences,
+        cancellationPolicy: confirmedBooking.cancellationPolicy,
+        confirmationNotes: confirmedBooking.confirmationNotes,
+        createdAt: confirmedBooking.createdAt,
+        updatedAt: confirmedBooking.updatedAt,
+        confirmedAt: confirmedBooking.confirmedAt
+      },
+      confirmation: {
+        confirmedBy: req.user.userId,
+        confirmedAt: confirmedBooking.confirmedAt,
+        notes: confirmationNotes || null,
+        availabilityUpdated: booking.status === 'pending'
+      }
+    });
+
+  } catch (error) {
+    console.error('Confirm booking error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 exports.getHotelBookings = async (req, res) => {
   try {
     const { hotelId } = req.params;
@@ -216,7 +340,6 @@ exports.deleteBooking = async (req, res) => {
       return res.status(403).json({ message: 'Access denied. You can only cancel your own bookings.' });
     }
 
-    // Vérifier que la réservation peut être annulée
     if (booking.status === 'cancelled') {
       return res.status(400).json({ message: 'Booking is already cancelled' });
     }
@@ -225,7 +348,6 @@ exports.deleteBooking = async (req, res) => {
       return res.status(400).json({ message: 'Cannot cancel completed bookings' });
     }
 
-    // Vérifier la politique d'annulation
     const canBeCancelled = booking.canBeCancelled();
     if (!canBeCancelled.canCancel) {
       return res.status(400).json({ 
@@ -235,13 +357,11 @@ exports.deleteBooking = async (req, res) => {
       });
     }
 
-    // Calculer les frais d'annulation si applicable
     let cancellationFee = 0;
     const now = new Date();
     const checkInDate = new Date(booking.checkIn);
     const daysUntilCheckIn = Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24));
 
-    // Appliquer la politique d'annulation
     switch (booking.cancellationPolicy) {
       case 'free_cancellation':
         cancellationFee = 0;
@@ -266,7 +386,6 @@ exports.deleteBooking = async (req, res) => {
         cancellationFee = 0;
     }
 
-    // Mettre à jour le statut de la réservation
     const updateData = {
       status: 'cancelled',
       cancelledAt: new Date(),
@@ -280,7 +399,6 @@ exports.deleteBooking = async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    // Libérer la disponibilité si la réservation était confirmée
     if (booking.status === 'confirmed' || booking.status === 'pending') {
       try {
         await Availability.bookPeriod(
@@ -295,7 +413,6 @@ exports.deleteBooking = async (req, res) => {
       }
     }
 
-    // Populate les références pour la réponse
     await cancelledBooking.populate([
       { path: 'hotelId', select: 'name location' },
       { path: 'roomId', select: 'type description' },

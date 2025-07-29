@@ -20,6 +20,7 @@ router.get('/bookings/hotel/:hotelId', authMiddleware, bookingController.getHote
 router.get('/bookings/:id', authMiddleware, bookingController.getBookingById);
 router.get('/bookings/:userId', authMiddleware, bookingController.getUserBookings);
 router.post('/bookings', authMiddleware, createBookingValidation, handleValidation, bookingController.createBooking);
+router.post('/bookings/:id/confirm', authMiddleware, bookingController.confirmBooking);
 router.put('/bookings/:id', authMiddleware, bookingController.updateBooking);
 router.delete('/bookings/:id', authMiddleware, bookingController.deleteBooking);
 
