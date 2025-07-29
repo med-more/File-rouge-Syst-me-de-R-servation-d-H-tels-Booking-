@@ -4,6 +4,152 @@ const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
 const mongoose = require('mongoose');
 
+exports.deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const bookingUserObjectId = new mongoose.Types.ObjectId(booking.userId);
+    
+    if (!userObjectId.equals(bookingUserObjectId)) {
+      return res.status(403).json({ message: 'Access denied. You can only cancel your own bookings.' });
+    }
+
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ message: 'Booking is already cancelled' });
+    }
+
+    if (booking.status === 'completed') {
+      return res.status(400).json({ message: 'Cannot cancel completed bookings' });
+    }
+
+    const canBeCancelled = booking.canBeCancelled();
+    if (!canBeCancelled.canCancel) {
+      return res.status(400).json({ 
+        message: 'Cannot cancel this booking',
+        reason: canBeCancelled.reason,
+        deadline: canBeCancelled.deadline
+      });
+    }
+
+    let cancellationFee = 0;
+    const now = new Date();
+    const checkInDate = new Date(booking.checkIn);
+    const daysUntilCheckIn = Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24));
+
+    switch (booking.cancellationPolicy) {
+      case 'free_cancellation':
+        cancellationFee = 0;
+        break;
+      case 'partial_refund':
+        if (daysUntilCheckIn <= 24) {
+          cancellationFee = booking.finalPrice * 0.5; 
+        } else if (daysUntilCheckIn <= 48) {
+          cancellationFee = booking.finalPrice * 0.25; 
+        } else {
+          cancellationFee = 0;
+        }
+        break;
+      case 'no_refund':
+        if (daysUntilCheckIn <= 72) {
+          cancellationFee = booking.finalPrice; 
+        } else {
+          cancellationFee = booking.finalPrice * 0.1; 
+        }
+        break;
+      default:
+        cancellationFee = 0;
+    }
+
+    const updateData = {
+      status: 'cancelled',
+      cancelledAt: new Date(),
+      cancellationReason: reason || 'Cancelled by user',
+      cancellationFee: cancellationFee
+    };
+
+    const cancelledBooking = await Booking.findByIdAndUpdate(
+      id,
+      updateData,
+      { new: true, runValidators: true }
+    );
+
+    if (booking.status === 'confirmed' || booking.status === 'pending') {
+      try {
+        await Availability.bookPeriod(
+          booking.hotelId,
+          booking.roomId,
+          booking.checkIn,
+          booking.checkOut,
+          -booking.guests.adults 
+        );
+      } catch (error) {
+        console.error('Error releasing availability:', error);
+      }
+    }
+
+
+    await cancelledBooking.populate([
+      { path: 'hotelId', select: 'name location' },
+      { path: 'roomId', select: 'type description' },
+      { path: 'userId', select: 'name email' }
+    ]);
+
+    res.json({
+      message: 'Booking cancelled successfully',
+      booking: {
+        _id: cancelledBooking._id,
+        bookingNumber: cancelledBooking.bookingNumber,
+        hotel: cancelledBooking.hotelId,
+        room: cancelledBooking.roomId,
+        user: cancelledBooking.userId,
+        checkIn: cancelledBooking.checkIn,
+        checkOut: cancelledBooking.checkOut,
+        numberOfNights: cancelledBooking.numberOfNights,
+        guests: cancelledBooking.guests,
+        guestDetails: cancelledBooking.guestDetails,
+        pricePerNight: cancelledBooking.pricePerNight,
+        totalPrice: cancelledBooking.totalPrice,
+        taxes: cancelledBooking.taxes,
+        fees: cancelledBooking.fees,
+        discount: cancelledBooking.discount,
+        finalPrice: cancelledBooking.finalPrice,
+        status: cancelledBooking.status,
+        paymentStatus: cancelledBooking.paymentStatus,
+        paymentMethod: cancelledBooking.paymentMethod,
+        specialRequests: cancelledBooking.specialRequests,
+        roomPreferences: cancelledBooking.roomPreferences,
+        cancellationPolicy: cancelledBooking.cancellationPolicy,
+        cancellationReason: cancelledBooking.cancellationReason,
+        cancellationFee: cancelledBooking.cancellationFee,
+        cancelledAt: cancelledBooking.cancelledAt,
+        createdAt: cancelledBooking.createdAt,
+        updatedAt: cancelledBooking.updatedAt
+      },
+      cancellation: {
+        fee: cancellationFee,
+        refundAmount: booking.finalPrice - cancellationFee,
+        policy: booking.cancellationPolicy,
+        daysUntilCheckIn,
+        reason: reason || 'Cancelled by user'
+      }
+    });
+
+  } catch (error) {
+    console.error('Delete booking error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 exports.updateBooking = async (req, res) => {
   try {
     const { id } = req.params;

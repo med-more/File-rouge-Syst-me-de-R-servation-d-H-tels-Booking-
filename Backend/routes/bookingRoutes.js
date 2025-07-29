@@ -20,5 +20,6 @@ router.get('/bookings/:id', authMiddleware, bookingController.getBookingById);
 router.get('/bookings/:userId', authMiddleware, bookingController.getUserBookings);
 router.post('/bookings', authMiddleware, createBookingValidation, handleValidation, bookingController.createBooking);
 router.put('/bookings/:id', authMiddleware, bookingController.updateBooking);
+router.delete('/bookings/:id', authMiddleware, bookingController.deleteBooking);
 
 module.exports = router;
