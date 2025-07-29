@@ -4,6 +4,201 @@ const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
 const mongoose = require('mongoose');
 
+exports.getHotelBookings = async (req, res) => {
+  try {
+    const { hotelId } = req.params;
+    const {
+      status,
+      paymentStatus,
+      checkIn,
+      checkOut,
+      roomId,
+      page = 1,
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+
+    const hotel = await Hotel.findById(hotelId);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    const filter = { hotelId };
+
+    if (status) {
+      filter.status = status;
+    }
+
+    if (paymentStatus) {
+      filter.paymentStatus = paymentStatus;
+    }
+
+    if (roomId) {
+      filter.roomId = roomId;
+    }
+
+    if (checkIn || checkOut) {
+      filter.checkIn = {};
+      if (checkIn) {
+        filter.checkIn.$gte = new Date(checkIn);
+      }
+      if (checkOut) {
+        filter.checkIn.$lte = new Date(checkOut);
+      }
+    }
+
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const bookings = await Booking.find(filter)
+      .populate('userId', 'name email phone')
+      .populate('roomId', 'type description pricePerNight maxGuests')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    const total = await Booking.countDocuments(filter);
+
+    const totalBookings = await Booking.countDocuments({ hotelId });
+    const confirmedBookings = await Booking.countDocuments({ hotelId, status: 'confirmed' });
+    const cancelledBookings = await Booking.countDocuments({ hotelId, status: 'cancelled' });
+    const completedBookings = await Booking.countDocuments({ hotelId, status: 'completed' });
+    const pendingBookings = await Booking.countDocuments({ hotelId, status: 'pending' });
+    const paidBookings = await Booking.countDocuments({ hotelId, paymentStatus: 'paid' });
+    const pendingPayments = await Booking.countDocuments({ hotelId, paymentStatus: 'pending' });
+
+    const revenueStats = await Booking.aggregate([
+      { $match: { hotelId: new mongoose.Types.ObjectId(hotelId) } },
+      {
+        $group: {
+          _id: null,
+          totalRevenue: { $sum: '$finalPrice' },
+          averageBookingValue: { $avg: '$finalPrice' },
+          totalNights: { $sum: '$numberOfNights' },
+          averageNights: { $avg: '$numberOfNights' }
+        }
+      }
+    ]);
+
+    const revenueData = revenueStats[0] || {
+      totalRevenue: 0,
+      averageBookingValue: 0,
+      totalNights: 0,
+      averageNights: 0
+    };
+
+    const monthlyStats = await Booking.aggregate([
+      { $match: { hotelId: new mongoose.Types.ObjectId(hotelId) } },
+      {
+        $group: {
+          _id: {
+            year: { $year: '$createdAt' },
+            month: { $month: '$createdAt' }
+          },
+          count: { $sum: 1 },
+          revenue: { $sum: '$finalPrice' },
+          averageValue: { $avg: '$finalPrice' }
+        }
+      },
+      { $sort: { '_id.year': -1, '_id.month': -1 } },
+      { $limit: 6 }
+    ]);
+
+    const totalPages = Math.ceil(total / parseInt(limit));
+    const hasNextPage = parseInt(page) < totalPages;
+    const hasPrevPage = parseInt(page) > 1;
+
+    res.json({
+      hotel: {
+        _id: hotel._id,
+        name: hotel.name,
+        location: hotel.location
+      },
+      bookings: bookings.map(booking => ({
+        _id: booking._id,
+        bookingNumber: booking.bookingNumber,
+        user: booking.userId,
+        room: booking.roomId,
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        numberOfNights: booking.numberOfNights,
+        guests: booking.guests,
+        guestDetails: booking.guestDetails,
+        pricePerNight: booking.pricePerNight,
+        totalPrice: booking.totalPrice,
+        taxes: booking.taxes,
+        fees: booking.fees,
+        discount: booking.discount,
+        finalPrice: booking.finalPrice,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        paymentMethod: booking.paymentMethod,
+        specialRequests: booking.specialRequests,
+        roomPreferences: booking.roomPreferences,
+        cancellationPolicy: booking.cancellationPolicy,
+        cancellationReason: booking.cancellationReason,
+        cancellationFee: booking.cancellationFee,
+        source: booking.source,
+        createdAt: booking.createdAt,
+        updatedAt: booking.updatedAt,
+        confirmedAt: booking.confirmedAt,
+        cancelledAt: booking.cancelledAt,
+        completedAt: booking.completedAt
+      })),
+      statistics: {
+        totalBookings,
+        confirmedBookings,
+        cancelledBookings,
+        completedBookings,
+        pendingBookings,
+        paidBookings,
+        pendingPayments,
+        confirmationRate: totalBookings > 0 ? Math.round((confirmedBookings / totalBookings) * 100) : 0,
+        cancellationRate: totalBookings > 0 ? Math.round((cancelledBookings / totalBookings) * 100) : 0,
+        completionRate: totalBookings > 0 ? Math.round((completedBookings / totalBookings) * 100) : 0,
+        paymentRate: totalBookings > 0 ? Math.round((paidBookings / totalBookings) * 100) : 0
+      },
+      revenue: {
+        totalRevenue: revenueData.totalRevenue,
+        averageBookingValue: Math.round(revenueData.averageBookingValue * 100) / 100,
+        totalNights: revenueData.totalNights,
+        averageNights: Math.round(revenueData.averageNights * 100) / 100,
+        monthlyStats: monthlyStats.map(stat => ({
+          month: `${stat._id.year}-${String(stat._id.month).padStart(2, '0')}`,
+          bookings: stat.count,
+          revenue: stat.revenue,
+          averageValue: Math.round(stat.averageValue * 100) / 100
+        }))
+      },
+      pagination: {
+        currentPage: parseInt(page),
+        totalPages,
+        totalItems: total,
+        itemsPerPage: parseInt(limit),
+        hasNextPage,
+        hasPrevPage
+      },
+      filters: {
+        status,
+        paymentStatus,
+        checkIn,
+        checkOut,
+        roomId
+      }
+    });
+
+  } catch (error) {
+    console.error('Get hotel bookings error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 exports.deleteBooking = async (req, res) => {
   try {
     const { id } = req.params;
@@ -21,6 +216,7 @@ exports.deleteBooking = async (req, res) => {
       return res.status(403).json({ message: 'Access denied. You can only cancel your own bookings.' });
     }
 
+    // Vérifier que la réservation peut être annulée
     if (booking.status === 'cancelled') {
       return res.status(400).json({ message: 'Booking is already cancelled' });
     }
@@ -29,6 +225,7 @@ exports.deleteBooking = async (req, res) => {
       return res.status(400).json({ message: 'Cannot cancel completed bookings' });
     }
 
+    // Vérifier la politique d'annulation
     const canBeCancelled = booking.canBeCancelled();
     if (!canBeCancelled.canCancel) {
       return res.status(400).json({ 
@@ -38,35 +235,38 @@ exports.deleteBooking = async (req, res) => {
       });
     }
 
+    // Calculer les frais d'annulation si applicable
     let cancellationFee = 0;
     const now = new Date();
     const checkInDate = new Date(booking.checkIn);
     const daysUntilCheckIn = Math.ceil((checkInDate - now) / (1000 * 60 * 60 * 24));
 
+    // Appliquer la politique d'annulation
     switch (booking.cancellationPolicy) {
       case 'free_cancellation':
         cancellationFee = 0;
         break;
       case 'partial_refund':
         if (daysUntilCheckIn <= 24) {
-          cancellationFee = booking.finalPrice * 0.5; 
+          cancellationFee = booking.finalPrice * 0.5; // 50% de frais
         } else if (daysUntilCheckIn <= 48) {
-          cancellationFee = booking.finalPrice * 0.25; 
+          cancellationFee = booking.finalPrice * 0.25; // 25% de frais
         } else {
           cancellationFee = 0;
         }
         break;
       case 'no_refund':
         if (daysUntilCheckIn <= 72) {
-          cancellationFee = booking.finalPrice; 
+          cancellationFee = booking.finalPrice; // Pas de remboursement
         } else {
-          cancellationFee = booking.finalPrice * 0.1; 
+          cancellationFee = booking.finalPrice * 0.1; // 10% de frais
         }
         break;
       default:
         cancellationFee = 0;
     }
 
+    // Mettre à jour le statut de la réservation
     const updateData = {
       status: 'cancelled',
       cancelledAt: new Date(),
@@ -80,6 +280,7 @@ exports.deleteBooking = async (req, res) => {
       { new: true, runValidators: true }
     );
 
+    // Libérer la disponibilité si la réservation était confirmée
     if (booking.status === 'confirmed' || booking.status === 'pending') {
       try {
         await Availability.bookPeriod(
@@ -87,14 +288,14 @@ exports.deleteBooking = async (req, res) => {
           booking.roomId,
           booking.checkIn,
           booking.checkOut,
-          -booking.guests.adults 
+          -booking.guests.adults // Libérer les chambres
         );
       } catch (error) {
         console.error('Error releasing availability:', error);
       }
     }
 
-
+    // Populate les références pour la réponse
     await cancelledBooking.populate([
       { path: 'hotelId', select: 'name location' },
       { path: 'roomId', select: 'type description' },
