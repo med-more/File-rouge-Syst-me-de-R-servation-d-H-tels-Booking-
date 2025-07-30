@@ -16,6 +16,7 @@ const handleValidation = (req, res, next) => {
   next();
 };
 
+router.post('/bookings/check-availability', authMiddleware, bookingController.checkAvailability);
 router.get('/bookings/hotel/:hotelId', authMiddleware, bookingController.getHotelBookings);
 router.get('/bookings/:id', authMiddleware, bookingController.getBookingById);
 router.get('/bookings/:userId', authMiddleware, bookingController.getUserBookings);

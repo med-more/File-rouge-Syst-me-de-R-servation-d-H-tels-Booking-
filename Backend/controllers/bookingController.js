@@ -4,6 +4,200 @@ const Hotel = require('../models/Hotel');
 const Availability = require('../models/Availability');
 const mongoose = require('mongoose');
 
+exports.checkAvailability = async (req, res) => {
+  try {
+    const {
+      hotelId,
+      roomId,
+      checkIn,
+      checkOut,
+      guests = 1,
+      includeRoomDetails = false
+    } = req.body;
+
+    if (!hotelId || !checkIn || !checkOut) {
+      return res.status(400).json({ 
+        message: 'Missing required parameters: hotelId, checkIn, checkOut' 
+      });
+    }
+
+    const hotel = await Hotel.findById(hotelId);
+    if (!hotel) {
+      return res.status(404).json({ message: 'Hotel not found' });
+    }
+
+    const checkInDate = new Date(checkIn);
+    const checkOutDate = new Date(checkOut);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (checkInDate < today) {
+      return res.status(400).json({ message: 'Check-in date cannot be in the past' });
+    }
+
+    if (checkOutDate <= checkInDate) {
+      return res.status(400).json({ message: 'Check-out date must be after check-in date' });
+    }
+
+    const roomFilter = { hotelId };
+    if (roomId) {
+      roomFilter._id = roomId;
+    }
+
+    const rooms = await Room.find(roomFilter);
+    if (rooms.length === 0) {
+      return res.status(404).json({ message: 'No rooms found for this hotel' });
+    }
+
+    const numberOfNights = Math.ceil((checkOutDate - checkInDate) / (1000 * 60 * 60 * 24));
+    const availabilityResults = [];
+
+    for (const room of rooms) {
+      if (guests > room.maxGuests) {
+        availabilityResults.push({
+          roomId: room._id,
+          roomType: room.type,
+          available: false,
+          reason: `Maximum ${room.maxGuests} guests allowed for this room type`,
+          maxGuests: room.maxGuests,
+          requestedGuests: guests
+        });
+        continue;
+      }
+
+      const availabilityCheck = await Availability.checkAvailability(
+        hotelId,
+        room._id,
+        checkInDate,
+        checkOutDate
+      );
+
+      if (availabilityCheck.available) {
+        const totalPrice = room.pricePerNight * numberOfNights;
+        
+        availabilityResults.push({
+          roomId: room._id,
+          roomType: room.type,
+          available: true,
+          pricePerNight: room.pricePerNight,
+          totalPrice: totalPrice,
+          numberOfNights: numberOfNights,
+          maxGuests: room.maxGuests,
+          requestedGuests: guests,
+          ...(includeRoomDetails && {
+            roomDetails: {
+              description: room.description,
+              amenities: room.amenities,
+              images: room.images,
+              quantity: room.quantity
+            }
+          })
+        });
+      } else {
+        availabilityResults.push({
+          roomId: room._id,
+          roomType: room.type,
+          available: false,
+          reason: availabilityCheck.reason || 'Room not available for selected dates',
+          maxGuests: room.maxGuests,
+          requestedGuests: guests
+        });
+      }
+    }
+
+    const availableRooms = availabilityResults.filter(room => room.available);
+    const unavailableRooms = availabilityResults.filter(room => !room.available);
+    const totalRooms = availabilityResults.length;
+
+    const prices = availableRooms.map(room => room.pricePerNight).sort((a, b) => a - b);
+    const lowestPrice = prices[0] || null;
+    const highestPrice = prices[prices.length - 1] || null;
+
+    res.json({
+      hotel: {
+        _id: hotel._id,
+        name: hotel.name,
+        location: hotel.location
+      },
+      searchCriteria: {
+        checkIn: checkInDate,
+        checkOut: checkOutDate,
+        numberOfNights: numberOfNights,
+        guests: guests,
+        roomId: roomId || 'all'
+      },
+      availability: {
+        totalRooms: totalRooms,
+        availableRooms: availableRooms.length,
+        unavailableRooms: unavailableRooms.length,
+        availabilityRate: totalRooms > 0 ? Math.round((availableRooms.length / totalRooms) * 100) : 0,
+        priceRange: {
+          lowest: lowestPrice,
+          highest: highestPrice
+        }
+      },
+      rooms: availabilityResults,
+      summary: {
+        hasAvailability: availableRooms.length > 0,
+        recommendedRoom: availableRooms.length > 0 ? availableRooms[0] : null,
+        alternativeDates: await generateAlternativeDates(hotelId, checkInDate, checkOutDate, guests)
+      }
+    });
+
+  } catch (error) {
+    console.error('Check availability error:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+async function generateAlternativeDates(hotelId, originalCheckIn, originalCheckOut, guests) {
+  const alternatives = [];
+  const originalNights = Math.ceil((originalCheckOut - originalCheckIn) / (1000 * 60 * 60 * 24));
+  
+  for (let dayOffset = -3; dayOffset <= 3; dayOffset++) {
+    if (dayOffset === 0) continue; 
+    
+    const newCheckIn = new Date(originalCheckIn);
+    newCheckIn.setDate(newCheckIn.getDate() + dayOffset);
+    
+    const newCheckOut = new Date(newCheckIn);
+    newCheckOut.setDate(newCheckOut.getDate() + originalNights);
+    
+    const rooms = await Room.find({ hotelId });
+    let hasAvailability = false;
+    
+    for (const room of rooms) {
+      if (guests <= room.maxGuests) {
+        const availabilityCheck = await Availability.checkAvailability(
+          hotelId,
+          room._id,
+          newCheckIn,
+          newCheckOut
+        );
+        
+        if (availabilityCheck.available) {
+          hasAvailability = true;
+          break;
+        }
+      }
+    }
+    
+    if (hasAvailability) {
+      alternatives.push({
+        checkIn: newCheckIn,
+        checkOut: newCheckOut,
+        dayOffset: dayOffset,
+        label: dayOffset > 0 ? `${dayOffset} days later` : `${Math.abs(dayOffset)} days earlier`
+      });
+    }
+  }
+  
+  return alternatives.slice(0, 3); 
+}
+
 exports.confirmBooking = async (req, res) => {
   try {
     const { id } = req.params;
