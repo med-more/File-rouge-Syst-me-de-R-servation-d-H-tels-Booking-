@@ -17,6 +17,14 @@ const hotelSchema = new mongoose.Schema({
   amenities: [{ type: String }],
   images: [{ type: String }],
   rooms: [roomSchema],
+  status: {
+    type: String,
+    enum: ['active', 'pending', 'inactive'],
+    default: 'active',
+  },
 }, { timestamps: true });
 
 module.exports = mongoose.model('Hotel', hotelSchema);
+
+
+

@@ -36,6 +36,11 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+    
+    // Mettre à jour lastLoginAt
+    user.lastLoginAt = new Date();
+    await user.save();
+    
     const token = jwt.sign(
       { userId: user._id, email: user.email },
       process.env.JWT_SECRET,

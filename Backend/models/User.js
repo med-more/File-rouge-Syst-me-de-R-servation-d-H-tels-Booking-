@@ -27,6 +27,24 @@ const userSchema = new mongoose.Schema(
       required: true,
       minlength: 8,
     },
+    address: {
+      type: String,
+      trim: true,
+    },
+    role: {
+      type: String,
+      enum: ['user', 'admin'],
+      default: 'user',
+    },
+    lastLoginAt: {
+      type: Date,
+    },
+    resetPasswordToken: {
+      type: String,
+    },
+    resetPasswordExpires: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
