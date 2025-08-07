@@ -19,4 +19,11 @@ router.put('/hotels/:id', adminController.updateHotel);
 router.delete('/hotels/:id', adminController.deleteHotel);
 router.patch('/hotels/:id/status', adminController.updateHotelStatus);
 
+// Gestion des réservations
+router.get('/bookings', adminController.getBookings);
+router.get('/bookings/:id', adminController.getBookingById);
+router.put('/bookings/:id', adminController.updateBooking);
+router.delete('/bookings/:id', adminController.deleteBooking);
+router.patch('/bookings/:id/status', adminController.updateBookingStatus);
+
 module.exports = router;
