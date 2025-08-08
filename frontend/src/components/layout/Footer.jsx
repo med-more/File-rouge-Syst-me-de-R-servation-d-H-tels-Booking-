@@ -25,6 +25,7 @@ const Footer = () => {
   return (
      <footer className="bg-gray-800 text-white py-12">
           <div className="container-custom grid grid-cols-1 md:grid-cols-4 gap-8">
+            {/* Company Info */}
             <div>
               <Link to="/" className="flex pb-4 items-center space-x-3 group">
             <div className="bg-gradient-to-r from-primary-600 to-primary-700 rounded-xl p-2 group-hover:from-primary-700 group-hover:to-primary-800 transition-all duration-200">
@@ -57,6 +58,7 @@ const Footer = () => {
               </div>
             </div>
 
+            {/* Quick Links */}
             <div>
               <h3 className="text-xl font-semibold mb-4 text-white">Quick Links</h3>
               <ul className="space-y-2">
@@ -88,6 +90,7 @@ const Footer = () => {
               </ul>
             </div>
 
+            {/* Support */}
             <div>
               <h3 className="text-xl font-semibold mb-4 text-white">Support</h3>
               <ul className="space-y-2">
@@ -109,6 +112,7 @@ const Footer = () => {
               </ul>
             </div>
 
+            {/* Hotel Logo */}
             <div className="flex justify-center items-center">
               <img src={hotelLogo} alt="Hotel Logo" className="max-w-full h-auto max-h-48 object-contain" />
             </div>
