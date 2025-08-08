@@ -1,0 +1,171 @@
+"use client"
+
+import { useState, useEffect } from "react"
+import { Link, useNavigate } from "react-router-dom"
+import { Formik, Form, Field, ErrorMessage } from "formik"
+import * as Yup from "yup"
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react"
+import { useAuth } from "../../contexts/AuthContext"
+import Lottie from "lottie-react"
+import loginAnimation from "../../data/login.json"
+
+const LoginSchema = Yup.object().shape({
+  email: Yup.string().email("Invalid email").required("Email is required"),
+  password: Yup.string().required("Password is required"),
+  rememberMe: Yup.boolean(),
+})
+
+const Login = () => {
+  const [showPassword, setShowPassword] = useState(false)
+  const { login, isAuthenticated } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate("/profile")
+    }
+  }, [isAuthenticated, navigate])
+
+  const handleSubmit = async (values, { setSubmitting, setFieldError }) => {
+    const result = await login(values.email, values.password)
+    if (result.success) {
+      navigate("/")
+    } else {
+      setFieldError("email", result.error)
+    }
+    setSubmitting(false)
+  }
+
+  return (
+    <div className="min-h-screen bg-white flex -mt-16 pt-32 relative overflow-hidden">
+      {/* Background Spots */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] bg-gradient-to-r from-blue-500 to-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
+      </div>
+
+      {/* Left Side - Login Form */}
+      <div className="flex-1 flex justify-center items-center px-4 sm:px-6 lg:px-8 py-8">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl p-8 shadow-2xl border border-gray-200">
+            <div className="text-center mb-6">
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center shadow-lg">
+                <User className="h-8 w-8 text-white" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
+              <p className="text-gray-600">Sign in to your account</p>
+            </div>
+
+            <Formik
+              initialValues={{
+                email: "",
+                password: "",
+                rememberMe: false,
+              }}
+              validationSchema={LoginSchema}
+              onSubmit={handleSubmit}
+            >
+              {({ isSubmitting }) => (
+                <Form className="space-y-4">
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Email Address
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                      <Field
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        placeholder="Enter your email"
+                      />
+                    </div>
+                    <ErrorMessage name="email" component="div" className="mt-1 text-sm text-red-600" />
+                  </div>
+
+                  <div>
+                    <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                      <Field
+                        id="password"
+                        name="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete="current-password"
+                        className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
+                        placeholder="Enter your password"
+                      />
+                      <button
+                        type="button"
+                        className="absolute right-3 top-3 text-gray-500 hover:text-gray-700 transition-colors"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                      </button>
+                    </div>
+                    <ErrorMessage name="password" component="div" className="mt-1 text-sm text-red-600" />
+                  </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Field
+                        id="rememberMe"
+                        name="rememberMe"
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2"
+                      />
+                      <label htmlFor="rememberMe" className="ml-3 text-sm text-gray-700">
+                        Remember me
+                      </label>
+                    </div>
+                    <Link to="/reset-password" className="text-sm text-blue-600 hover:text-blue-500 font-medium transition-colors">
+                      Forgot password?
+                    </Link>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center shadow-lg hover:shadow-xl mt-6"
+                  >
+                    {isSubmitting ? (
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    ) : (
+                      <>
+                        Sign In
+                        <ArrowRight className="ml-2 h-5 w-5" />
+                      </>
+                    )}
+                  </button>
+                </Form>
+              )}
+            </Formik>
+
+            <div className="mt-6 text-center">
+              <p className="text-gray-600">
+                Don't have an account?{" "}
+                <Link to="/register" className="text-blue-600 hover:text-blue-500 font-semibold transition-colors">
+                  Sign up
+                </Link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Side - Animation */}
+      <div className="hidden lg:flex lg:flex-1 items-center justify-center p-8">
+        <div className="max-w-md w-full -mt-16">
+          <Lottie animationData={loginAnimation} loop={true} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default Login
