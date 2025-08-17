@@ -1,51 +1,111 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Link, useNavigate } from "react-router-dom"
+import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react"
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import Lottie from "lottie-react"
 import loginAnimation from "../../data/login.json"
 
 const LoginSchema = Yup.object().shape({
-  email: Yup.string().email("Invalid email").required("Email is required"),
-  password: Yup.string().required("Password is required"),
+  email: Yup.string().email("Email invalide").required("Email requis"),
+  password: Yup.string().required("Mot de passe requis"),
   rememberMe: Yup.boolean(),
 })
 
 const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
-  const { login, isAuthenticated } = useAuth()
+  const [loginError, setLoginError] = useState("")
+  const { login, isAuthenticated, isAdmin, loading } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate("/profile")
+    if (isAuthenticated && !loading) {
+      const from = location.state?.from?.pathname || "/"
+      
+      console.log('Login redirect:', { 
+        isAuthenticated, 
+        isAdmin, 
+        from, 
+        targetPath: isAdmin ? "/admin" : from 
+      })
+      
+      if (isAdmin) {
+        console.log('Redirecting admin to /admin')
+        navigate("/admin", { replace: true })
+      } else {
+        console.log('Redirecting user to:', from)
+        navigate(from, { replace: true })
+      }
     }
-  }, [isAuthenticated, navigate])
+  }, [isAuthenticated, isAdmin, loading, navigate, location])
 
   const handleSubmit = async (values, { setSubmitting, setFieldError }) => {
-    const result = await login(values.email, values.password)
-    if (result.success) {
-      navigate("/")
-    } else {
-      setFieldError("email", result.error)
+    setLoginError("")
+    
+    try {
+      console.log('Login attempt with:', { email: values.email, rememberMe: values.rememberMe })
+      
+      const result = await login(values.email, values.password)
+      console.log('Login result:', result)
+      
+      if (result.success) {
+        console.log("Connexion réussie, redirection en cours...")
+        
+        if (values.rememberMe) {
+          localStorage.setItem("rememberMe", "true")
+        } else {
+          localStorage.removeItem("rememberMe")
+        }
+      } else {
+        const errorMsg = result.error || "Échec de la connexion"
+        console.error('Login failed:', errorMsg)
+        setLoginError(errorMsg)
+        setFieldError("email", errorMsg)
+      }
+    } catch (error) {
+      console.error('Login unexpected error:', error)
+      const errorMsg = "Une erreur inattendue s'est produite"
+      setLoginError(errorMsg)
+      setFieldError("email", errorMsg)
+    } finally {
+      setSubmitting(false)
     }
-    setSubmitting(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Vérification de l'authentification...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (isAuthenticated && !loading) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Redirection en cours...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-white flex -mt-16 pt-32 relative overflow-hidden">
-      {/* Background Spots */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] bg-gradient-to-r from-blue-500 to-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
       </div>
 
-      {/* Left Side - Login Form */}
       <div className="flex-1 flex justify-center items-center px-4 sm:px-6 lg:px-8 py-8">
         <div className="max-w-md w-full">
           <div className="bg-white rounded-2xl p-8 shadow-2xl border border-gray-200">
@@ -53,9 +113,16 @@ const Login = () => {
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-full p-3 w-16 h-16 mx-auto mb-4 flex items-center justify-center shadow-lg">
                 <User className="h-8 w-8 text-white" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome Back</h2>
-              <p className="text-gray-600">Sign in to your account</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">Bienvenue</h2>
+              <p className="text-gray-600">Connectez-vous à votre compte</p>
             </div>
+
+            {loginError && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center">
+                <AlertCircle className="h-5 w-5 mr-2" />
+                {loginError}
+              </div>
+            )}
 
             <Formik
               initialValues={{
@@ -70,7 +137,7 @@ const Login = () => {
                 <Form className="space-y-4">
                   <div>
                     <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
-                      Email Address
+                      Adresse email
                     </label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
@@ -80,15 +147,22 @@ const Login = () => {
                         type="email"
                         autoComplete="email"
                         className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="Enter your email"
+                        placeholder="Entrez votre email"
                       />
                     </div>
-                    <ErrorMessage name="email" component="div" className="mt-1 text-sm text-red-600" />
+                    <ErrorMessage name="email" component="div" className="mt-1 text-sm text-red-600 flex items-center">
+                      {msg => (
+                        <>
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {msg}
+                        </>
+                      )}
+                    </ErrorMessage>
                   </div>
 
                   <div>
                     <label htmlFor="password" className="block text-sm font-semibold text-gray-700 mb-2">
-                      Password
+                      Mot de passe
                     </label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
@@ -98,7 +172,7 @@ const Login = () => {
                         type={showPassword ? "text" : "password"}
                         autoComplete="current-password"
                         className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200"
-                        placeholder="Enter your password"
+                        placeholder="Entrez votre mot de passe"
                       />
                       <button
                         type="button"
@@ -108,7 +182,14 @@ const Login = () => {
                         {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
                       </button>
                     </div>
-                    <ErrorMessage name="password" component="div" className="mt-1 text-sm text-red-600" />
+                    <ErrorMessage name="password" component="div" className="mt-1 text-sm text-red-600 flex items-center">
+                      {msg => (
+                        <>
+                          <AlertCircle className="h-4 w-4 mr-1" />
+                          {msg}
+                        </>
+                      )}
+                    </ErrorMessage>
                   </div>
 
                   <div className="flex items-center justify-between">
@@ -120,11 +201,11 @@ const Login = () => {
                         className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-2"
                       />
                       <label htmlFor="rememberMe" className="ml-3 text-sm text-gray-700">
-                        Remember me
+                        Se souvenir de moi
                       </label>
                     </div>
                     <Link to="/reset-password" className="text-sm text-blue-600 hover:text-blue-500 font-medium transition-colors">
-                      Forgot password?
+                      Mot de passe oublié ?
                     </Link>
                   </div>
 
@@ -134,10 +215,13 @@ const Login = () => {
                     className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold py-3 px-6 rounded-lg transition-all duration-200 transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center shadow-lg hover:shadow-xl mt-6"
                   >
                     {isSubmitting ? (
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      <div className="flex items-center">
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                        Connexion en cours...
+                      </div>
                     ) : (
                       <>
-                        Sign In
+                        Se connecter
                         <ArrowRight className="ml-2 h-5 w-5" />
                       </>
                     )}
@@ -148,9 +232,9 @@ const Login = () => {
 
             <div className="mt-6 text-center">
               <p className="text-gray-600">
-                Don't have an account?{" "}
+                Vous n'avez pas de compte ?{" "}
                 <Link to="/register" className="text-blue-600 hover:text-blue-500 font-semibold transition-colors">
-                  Sign up
+                  S'inscrire
                 </Link>
               </p>
             </div>
@@ -158,7 +242,6 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Right Side - Animation */}
       <div className="hidden lg:flex lg:flex-1 items-center justify-center p-8">
         <div className="max-w-md w-full -mt-16">
           <Lottie animationData={loginAnimation} loop={true} />

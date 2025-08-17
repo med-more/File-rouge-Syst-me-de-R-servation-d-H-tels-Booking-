@@ -39,13 +39,11 @@ const Register = () => {
   const { register, isAuthenticated } = useAuth()
   const navigate = useNavigate()
 
-  // Filter countries based on search term
   const filteredCountries = countriesData.countries.filter(country =>
     country.name.toLowerCase().includes(countrySearchTerm.toLowerCase()) ||
     country.code.includes(countrySearchTerm)
   )
 
-  // Handle click outside to close dropdown
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (countryDropdownRef.current && !countryDropdownRef.current.contains(event.target)) {
@@ -76,7 +74,10 @@ const Register = () => {
   const handleSubmit = async (values, { setSubmitting, setFieldError }) => {
     const result = await register(values.name, values.email, values.countryCode, values.phone, values.password)
     if (result.success) {
-      navigate("/login")
+      navigate("/verify-email", { 
+        state: { email: values.email },
+        replace: true 
+      })
     } else {
       setFieldError("email", result.error)
     }
@@ -84,7 +85,6 @@ const Register = () => {
   }
 
   const handleGoogleSignIn = () => {
-    // Implementation of Google sign-in
   }
 
   const benefits = [
@@ -107,21 +107,18 @@ const Register = () => {
 
   return (
     <div className="min-h-screen bg-white flex -mt-16 pt-32 relative overflow-hidden">
-      {/* Background Spots */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[32rem] h-[32rem] bg-gradient-to-r from-blue-500 to-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-15"></div>
       </div>
 
-      {/* Left Side - Animation */}
       <div className="hidden lg:flex lg:flex-1 items-center justify-center p-8">
         <div className="max-w-md w-full -mt-56">
           <Lottie animationData={registerAnimation} loop={true} />
         </div>
       </div>
 
-      {/* Right Side - Registration Form */}
       <div className="flex-1 flex justify-center items-center px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
         <div className="w-full max-w-md">
           <div className="bg-white rounded-2xl p-4 sm:p-6 lg:p-8 shadow-2xl border border-gray-200">
