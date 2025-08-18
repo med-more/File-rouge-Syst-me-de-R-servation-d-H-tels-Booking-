@@ -162,12 +162,28 @@ exports.forgotPassword = async (req, res) => {
       },
     });
 
-    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}`;
+    const frontendBaseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const resetUrl = `${frontendBaseUrl}/reset-password/${encodeURIComponent(resetToken)}`;
+    console.log('RESET URL (for test):', resetUrl);
+
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
-      subject: 'Password Reset',
-      html: `<p>You requested a password reset.</p><p>Click <a href="${resetUrl}">here</a> to reset your password. This link is valid for 1 hour.</p>`,
+      subject: 'Réinitialisation de mot de passe',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2 style="color: #1f2937;">Réinitialisation de votre mot de passe</h2>
+          <p style="color: #4b5563; font-size: 16px;">Bonjour ${user.name},</p>
+          <p style="color: #4b5563; font-size: 16px;">Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe. Ce lien est valable 1 heure.</p>
+          <div style="margin: 20px 0;">
+            <a href="${resetUrl}" style="display: inline-block; background: #2563eb; color: #ffffff; padding: 12px 20px; border-radius: 8px; text-decoration: none;">Définir un nouveau mot de passe</a>
+          </div>
+          <p style="color: #6b7280; font-size: 14px;">Si le bouton ne fonctionne pas, copiez et collez ce lien dans votre navigateur :</p>
+          <p style="color: #2563eb; font-size: 14px; word-break: break-all;">${resetUrl}</p>
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+          <p style="color: #6b7280; font-size: 12px;">Si vous n'êtes pas à l'origine de cette demande, vous pouvez ignorer cet email.</p>
+        </div>
+      `,
     };
     await transporter.sendMail(mailOptions);
     res.json({ message: 'Password reset email sent' });
