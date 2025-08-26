@@ -110,6 +110,13 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+    // Bloquer si email non vérifié
+    if (!user.isEmailVerified) {
+      return res.status(403).json({ 
+        message: 'Email non vérifié. Veuillez vérifier votre email.',
+        code: 'EMAIL_NOT_VERIFIED'
+      });
+    }
     
     // Mettre à jour lastLoginAt
     user.lastLoginAt = new Date();
@@ -128,7 +135,8 @@ exports.login = async (req, res) => {
         email: user.email,
         role: user.role,
         phone: user.phone,
-        address: user.address
+        address: user.address,
+        profileImage: user.profileImage
       } 
     });
   } catch (error) {
@@ -138,6 +146,37 @@ exports.login = async (req, res) => {
 
 exports.logout = (req, res) => {
   res.json({ message: 'Logged out successfully' });
+};
+
+exports.changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: 'Current and new password are required' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'New password must be at least 8 characters' });
+    }
+
+    const user = await User.findById(req.user.userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    await user.save();
+
+    res.json({ message: 'Password changed successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
 };
 
 exports.forgotPassword = async (req, res) => {
@@ -338,7 +377,8 @@ exports.getMe = async (req, res) => {
         address: user.address,
         isEmailVerified: user.isEmailVerified,
         isPhoneVerified: user.isPhoneVerified,
-        createdAt: user.createdAt
+        createdAt: user.createdAt,
+        profileImage: user.profileImage
       }
     });
   } catch (error) {

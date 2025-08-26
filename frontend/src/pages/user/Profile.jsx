@@ -8,7 +8,7 @@ import { User, Mail, Phone, Lock, Camera, Shield, Bell, CreditCard, Eye, EyeOff 
 import { useAuth } from "../../contexts/AuthContext"
 import { toast } from "react-toastify"
 import axios from "axios"
-import { logout } from "../../utils/auth" // Import logout function
+// Utiliser le logout du contexte d'authentification
 
 const ProfileSchema = Yup.object().shape({
   name: Yup.string().required("Name is required"),
@@ -25,7 +25,7 @@ const PasswordSchema = Yup.object().shape({
 })
 
 const Profile = () => {
-  const { user, updateProfile } = useAuth()
+  const { user, updateProfile, logout } = useAuth()
   const navigate = useNavigate()
   const [activeTab, setActiveTab] = useState("profile")
   const [showPasswords, setShowPasswords] = useState({
@@ -45,19 +45,8 @@ const Profile = () => {
   useEffect(() => {
     if (user) {
       setImagePreview(user.profileImage)
-      // Load user notification preferences
-      fetchNotificationSettings()
     }
   }, [user])
-
-  const fetchNotificationSettings = async () => {
-    try {
-      const response = await axios.get("/api/user/notification-settings")
-      setNotifications(response.data.settings)
-    } catch (error) {
-      console.error("Error fetching notification settings:", error)
-    }
-  }
 
   const handleImageChange = (event) => {
     const file = event.target.files[0]
@@ -73,16 +62,13 @@ const Profile = () => {
 
   const handleProfileSubmit = async (values, { setSubmitting }) => {
     try {
-      const formData = new FormData()
-      Object.keys(values).forEach((key) => {
-        formData.append(key, values[key])
-      })
-
-      if (profileImage) {
-        formData.append("profileImage", profileImage)
+      const payload = {
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        profileImage: imagePreview || user?.profileImage || ""
       }
-
-      const result = await updateProfile(formData)
+      const result = await updateProfile(payload)
       if (result.success) {
         toast.success("Profile updated successfully!")
       }
@@ -95,50 +81,78 @@ const Profile = () => {
 
   const handlePasswordSubmit = async (values, { setSubmitting, resetForm }) => {
     try {
-      await axios.put("/api/auth/change-password", {
+      const res = await axios.post('http://localhost:5000/api/auth/change-password', {
         currentPassword: values.currentPassword,
         newPassword: values.newPassword,
       })
       toast.success("Password changed successfully!")
       resetForm()
-    } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to change password")
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleNotificationChange = async (key, value) => {
-    try {
-      const updatedSettings = { ...notifications, [key]: value }
-      setNotifications(updatedSettings)
-      await axios.put("/api/user/notification-settings", { settings: updatedSettings })
-      toast.success("Notification settings updated!")
-    } catch (error) {
-      toast.error("Failed to update notification settings")
-    }
+    const updatedSettings = { ...notifications, [key]: value }
+    setNotifications(updatedSettings)
+    toast.info("Préférences enregistrées localement")
   }
 
   const handleVerifyPhone = () => {
     navigate("/verify-phone", { state: { phone: user.phone } })
   }
 
-  const handleDeleteAccount = async () => {
-    if (
-      window.confirm(
-        "Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently removed.",
-      )
-    ) {
-      try {
-        await axios.delete("/api/auth/delete-account")
-        toast.success("Account deleted successfully")
-        // Logout and redirect
-        logout()
-        navigate("/")
-      } catch (error) {
-        toast.error("Failed to delete account")
+  const handleDeleteAccount = () => {
+    const toastId = toast.info(
+      (
+        <div className="space-y-3">
+          <p className="text-sm text-gray-800">
+            Are you sure you want to delete your account? This action is irreversible.
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              className="px-3 py-1.5 rounded-md text-white bg-red-600 hover:bg-red-700 text-sm"
+              onClick={async () => {
+                try {
+                  await axios.delete('http://localhost:5000/api/profile')
+                  toast.update(toastId, {
+                    render: 'Account deleted successfully',
+                    type: 'success',
+                    autoClose: 2000,
+                    closeOnClick: true,
+                  })
+                  logout()
+                  navigate('/')
+                } catch (error) {
+                  toast.update(toastId, {
+                    render: 'Failed to delete account',
+                    type: 'error',
+                    autoClose: 3000,
+                    closeOnClick: true,
+                  })
+                }
+              }}
+            >
+              Confirm
+            </button>
+            <button
+              className="px-3 py-1.5 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-sm"
+              onClick={() => toast.dismiss(toastId)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      ),
+      {
+        position: 'top-center',
+        autoClose: false,
+        closeOnClick: false,
+        draggable: false,
+        hideProgressBar: true,
+        closeButton: false,
       }
-    }
+    )
   }
 
   const tabs = [
