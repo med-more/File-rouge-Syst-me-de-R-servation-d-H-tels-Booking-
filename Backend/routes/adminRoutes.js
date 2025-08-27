@@ -26,4 +26,13 @@ router.put('/bookings/:id', adminController.updateBooking);
 router.delete('/bookings/:id', adminController.deleteBooking);
 router.patch('/bookings/:id/status', adminController.updateBookingStatus);
 
+// Gestion des utilisateurs
+router.get('/users', adminController.getUsers);
+router.get('/users/:id', adminController.getUserById);
+router.put('/users/:id/role', adminController.updateUserRole);
+router.put('/users/:id/status', adminController.updateUserStatus);
+router.delete('/users/:id', adminController.deleteUser);
+router.post('/users/bulk-action', adminController.bulkUserAction);
+router.get('/users/export', adminController.exportUsers);
+
 module.exports = router;

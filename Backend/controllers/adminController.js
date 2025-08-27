@@ -808,3 +808,235 @@ exports.updateBookingStatus = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Gestion des utilisateurs
+exports.getUsers = async (req, res) => {
+  try {
+    const { page = 1, limit = 50, search, role, status } = req.query;
+    
+    let query = {};
+    
+    // Filtre par recherche
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Filtre par rôle
+    if (role && role !== 'all') {
+      query.role = role;
+    }
+    
+    // Filtre par statut
+    if (status && status !== 'all') {
+      if (status === 'active') {
+        query.status = 'active';
+      } else if (status === 'inactive') {
+        query.status = 'inactive';
+      } else if (status === 'verified') {
+        query.isEmailVerified = true;
+      } else if (status === 'unverified') {
+        query.isEmailVerified = false;
+      }
+    }
+    
+    const skip = (page - 1) * limit;
+    
+    const users = await User.find(query)
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await User.countDocuments(query);
+    
+    res.json({
+      success: true,
+      users,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    
+    if (!['user', 'admin'].includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.updateUserStatus = async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['active', 'inactive'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    res.json({ success: true, user });
+  } catch (error) {
+    console.error('Error updating user status:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Vérifier s'il y a des réservations actives
+    const activeBookings = await Booking.countDocuments({
+      userId: user._id,
+      status: { $in: ['confirmed', 'pending'] }
+    });
+    
+    if (activeBookings > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete user with active bookings',
+        code: 'ACTIVE_BOOKINGS_EXIST',
+        activeBookings 
+      });
+    }
+    
+    await User.findByIdAndDelete(req.params.id);
+    
+    res.json({ success: true, message: 'User deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.bulkUserAction = async (req, res) => {
+  try {
+    const { userIds, action } = req.body;
+    
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ message: 'User IDs are required' });
+    }
+    
+    if (!['activate', 'deactivate', 'delete'].includes(action)) {
+      return res.status(400).json({ message: 'Invalid action' });
+    }
+    
+    let updateData = {};
+    let deleteUsers = false;
+    
+    switch (action) {
+      case 'activate':
+        updateData = { status: 'active' };
+        break;
+      case 'deactivate':
+        updateData = { status: 'inactive' };
+        break;
+      case 'delete':
+        deleteUsers = true;
+        break;
+    }
+    
+    if (deleteUsers) {
+      // Vérifier les réservations actives avant suppression
+      const usersWithBookings = await Booking.aggregate([
+        { $match: { userId: { $in: userIds }, status: { $in: ['confirmed', 'pending'] } } },
+        { $group: { _id: '$userId', count: { $sum: 1 } } }
+      ]);
+      
+      if (usersWithBookings.length > 0) {
+        return res.status(400).json({ 
+          message: 'Some users have active bookings and cannot be deleted',
+          usersWithBookings 
+        });
+      }
+      
+      await User.deleteMany({ _id: { $in: userIds } });
+    } else {
+      await User.updateMany({ _id: { $in: userIds } }, updateData);
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Bulk action '${action}' completed successfully` 
+    });
+  } catch (error) {
+    console.error('Error performing bulk action:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.exportUsers = async (req, res) => {
+  try {
+    const users = await User.find().select('-password').sort({ createdAt: -1 });
+    
+    // Créer le CSV
+    const csvHeader = 'Name,Email,Role,Status,Email Verified,Created At\n';
+    const csvRows = users.map(user => {
+      return `${user.name || ''},${user.email},${user.role},${user.status || 'active'},${user.isEmailVerified ? 'Yes' : 'No'},${user.createdAt}`;
+    }).join('\n');
+    
+    const csvContent = csvHeader + csvRows;
+    
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename=users-export.csv');
+    res.send(csvContent);
+  } catch (error) {
+    console.error('Error exporting users:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
