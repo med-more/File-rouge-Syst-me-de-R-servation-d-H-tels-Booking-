@@ -25,6 +25,7 @@ import {
 import { useAuth } from "../contexts/AuthContext"
 import { useBooking } from "../contexts/BookingContext"
 import axios from "axios"
+import { formatCurrencyMAD } from "../utils/helpers"
 import { toast } from "react-toastify"
 
 const HotelDetails = () => {
@@ -56,74 +57,113 @@ const HotelDetails = () => {
 
   useEffect(() => {
     fetchHotelDetails()
+    fetchHotelRooms()
   }, [id])
+
+  // Vérifier la disponibilité quand les dates de réservation changent
+  useEffect(() => {
+    if (bookingData.checkIn && bookingData.checkOut && selectedRoom) {
+      const timeoutId = setTimeout(() => {
+        checkAvailability()
+      }, 1000) // Délai de 1 seconde pour éviter trop d'appels API
+      
+      return () => clearTimeout(timeoutId)
+    }
+  }, [bookingData.checkIn, bookingData.checkOut, bookingData.guests])
+
+  // Vérifier si l'hôtel est dans les favoris au chargement
+  useEffect(() => {
+    if (hotel && isAuthenticated) {
+      const favorites = JSON.parse(localStorage.getItem('favorites') || '[]')
+      setIsFavorite(favorites.some((f) => f.id === hotel._id))
+    }
+  }, [hotel, isAuthenticated])
 
   const fetchHotelDetails = async () => {
     setLoading(true)
     try {
-      // Simuler un délai de chargement
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Appel API au backend pour récupérer les détails de l'hôtel
+      const { data } = await axios.get(`http://localhost:5000/api/hotels/${id}`)
       
-      // Données statiques pour les détails de l'hôtel
-      const staticHotel = {
-        _id: id,
-        name: "Hôtel Luxe Paris",
-        location: "Paris, France",
-        description: "Un hôtel de luxe au cœur de Paris, offrant un service exceptionnel et des installations de classe mondiale. Profitez d'une vue imprenable sur la ville et d'un accès facile aux attractions principales.",
-        pricePerNight: 250,
-        rating: 4.5,
-        amenities: ["wifi", "parking", "restaurant", "pool", "spa"],
-        images: [
-          "https://images.unsplash.com/photo-1566073771259-6a8506099945?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1582719508461-905c673771fd?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80",
-          "https://images.unsplash.com/photo-1578683010236-d716f9a3f461?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1200&q=80"
-        ],
-        rooms: [
-          {
-            type: "Chambre Standard",
-            description: "Chambre confortable avec lit queen-size et salle de bain privative",
-            pricePerNight: 250,
-            maxGuests: 2,
-            quantity: 10,
-            amenities: ["wifi", "tv", "minibar", "climatisation"]
-          },
-          {
-            type: "Suite Deluxe",
-            description: "Suite spacieuse avec salon séparé et vue panoramique",
-            pricePerNight: 450,
-            maxGuests: 4,
-            quantity: 5,
-            amenities: ["wifi", "tv", "minibar", "climatisation", "jacuzzi"]
-          }
-        ],
-        reviews: [
-          {
-            _id: "1",
-            user: "Jean Dupont",
-            rating: 5,
-            comment: "Excellent séjour, service impeccable !",
-            date: "2024-03-01"
-          },
-          {
-            _id: "2",
-            user: "Marie Martin",
-            rating: 4,
-            comment: "Très bon hôtel, je recommande.",
-            date: "2024-02-15"
-          }
-        ]
-      }
-      
-      setHotel(staticHotel)
-      if (staticHotel.rooms?.length > 0) {
-        setSelectedRoom(staticHotel.rooms[0])
+      if (data.hotel) {
+        setHotel(data.hotel)
+        if (data.hotel.rooms?.length > 0) {
+          setSelectedRoom(data.hotel.rooms[0])
+        }
+      } else {
+        toast.error("Hôtel non trouvé")
+        navigate("/hotels")
       }
     } catch (error) {
       console.error("Erreur lors du chargement des détails de l'hôtel:", error)
-      toast.error("Erreur lors du chargement des détails de l'hôtel")
+      if (error.response?.status === 404) {
+        toast.error("Hôtel non trouvé")
+      } else {
+        toast.error(error.response?.data?.message || "Erreur lors du chargement des détails de l'hôtel")
+      }
       navigate("/hotels")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchHotelRooms = async () => {
+    try {
+      // Récupérer les chambres de l'hôtel
+      const { data } = await axios.get(`http://localhost:5000/api/hotels/${id}/rooms`)
+      
+      if (data.rooms) {
+        // Mettre à jour l'hôtel avec les chambres récupérées
+        setHotel(prevHotel => ({
+          ...prevHotel,
+          rooms: data.rooms
+        }))
+        
+        if (data.rooms.length > 0) {
+          setSelectedRoom(data.rooms[0])
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des chambres:", error)
+      // Ne pas afficher d'erreur car l'hôtel peut ne pas avoir de chambres
+    }
+  }
+
+  const checkAvailability = async () => {
+    if (!bookingData.checkIn || !bookingData.checkOut || !selectedRoom) {
+      return
+    }
+    
+    try {
+      const params = {
+        checkIn: bookingData.checkIn,
+        checkOut: bookingData.checkOut,
+        guests: bookingData.guests
+      }
+      
+      const { data } = await axios.get(`http://localhost:5000/api/hotels/${id}/availability`, { params })
+      
+      if (data.availability) {
+        // Mettre à jour les chambres avec la disponibilité
+        const updatedRooms = data.availability.map(room => ({
+          ...room,
+          isAvailable: room.isAvailable
+        }))
+        
+        setHotel(prevHotel => ({
+          ...prevHotel,
+          rooms: updatedRooms
+        }))
+        
+        // Vérifier si la chambre sélectionnée est toujours disponible
+        const currentRoom = updatedRooms.find(room => room.type === selectedRoom.type)
+        if (currentRoom && currentRoom.isAvailable) {
+          setSelectedRoom(currentRoom)
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors de la vérification de la disponibilité:", error)
+      toast.error("Erreur lors de la vérification de la disponibilité")
     }
   }
 
@@ -151,20 +191,33 @@ const HotelDetails = () => {
 
   const handleBooking = () => {
     if (!isAuthenticated) {
-      toast.error("Please login to make a booking")
-      navigate("/login")
+      toast.error("Veuillez vous connecter pour effectuer une réservation")
+      return
+    }
+
+    if (!selectedRoom) {
+      toast.error("Veuillez sélectionner une chambre")
       return
     }
 
     if (!bookingData.checkIn || !bookingData.checkOut) {
-      toast.error("Please select check-in and check-out dates")
+      toast.error("Veuillez sélectionner les dates d'arrivée et de départ")
+      return
+    }
+
+    if (bookingData.guests > selectedRoom.maxGuests) {
+      toast.error(`Cette chambre ne peut accueillir que ${selectedRoom.maxGuests} personnes maximum`)
       return
     }
 
     const booking = {
       hotelId: hotel._id,
       hotelName: hotel.name,
-      roomType: selectedRoom?.type || "Standard Room",
+      hotelLocation: hotel.location,
+      hotelImage: hotel.images?.[0],
+      roomId: selectedRoom._id,
+      roomType: selectedRoom.type,
+      roomDescription: selectedRoom.description,
       checkIn: bookingData.checkIn,
       checkOut: bookingData.checkOut,
       guests: bookingData.guests,
@@ -177,16 +230,43 @@ const HotelDetails = () => {
 
   const toggleFavorite = async () => {
     if (!isAuthenticated) {
-      toast.error("Please login to save favorites")
+      toast.error("Veuillez vous connecter pour sauvegarder vos favoris")
       return
     }
 
     try {
-      await axios.post(`/api/favorites/${hotel._id}`)
-      setIsFavorite(!isFavorite)
-      toast.success(isFavorite ? "Removed from favorites" : "Added to favorites")
+      const stored = localStorage.getItem('favorites')
+      const favorites = stored ? JSON.parse(stored) : []
+
+      // Normaliser: tableau d'objets avec {id, name, image, location, pricePerNight, rating}
+      const isObjectArray = favorites.every((f) => typeof f === 'object' && f !== null && 'id' in f)
+      const normalized = isObjectArray
+        ? favorites
+        : favorites.map((id) => ({ id }))
+
+      const exists = normalized.some((f) => f.id === hotel._id)
+      if (exists) {
+        const updated = normalized.filter((f) => f.id !== hotel._id)
+        localStorage.setItem('favorites', JSON.stringify(updated))
+        setIsFavorite(false)
+        toast.success("Retiré des favoris")
+      } else {
+        const favoriteItem = {
+          id: hotel._id,
+          name: hotel.name,
+          image: hotel.images?.[0] || '',
+          location: hotel.location,
+          pricePerNight: hotel.pricePerNight,
+          rating: hotel.rating,
+        }
+        const updated = [...normalized, favoriteItem]
+        localStorage.setItem('favorites', JSON.stringify(updated))
+        setIsFavorite(true)
+        toast.success("Ajouté aux favoris")
+      }
     } catch (error) {
-      toast.error("Failed to update favorites")
+      console.error("Erreur lors de la mise à jour des favoris:", error)
+      toast.error("Erreur lors de la mise à jour des favoris")
     }
   }
 
@@ -327,8 +407,8 @@ const HotelDetails = () => {
                   </div>
                 </div>
                 <div className="text-right">
-                  <div className="text-3xl font-bold text-primary-600">${hotel.pricePerNight}</div>
-                  <div className="text-gray-600">per night</div>
+                  <div className="text-3xl font-bold text-primary-600">{formatCurrencyMAD(hotel.pricePerNight)}</div>
+                  <div className="text-gray-600">par nuit</div>
                 </div>
               </div>
               </div>
@@ -364,47 +444,72 @@ const HotelDetails = () => {
             </div>
 
             {/* Rooms */}
-            {hotel.rooms && hotel.rooms.length > 0 && (
+            {hotel.rooms && hotel.rooms.length > 0 ? (
               <div className="bg-white rounded-2xl shadow-soft p-8 border border-gray-100">
-                <h2 className="text-2xl font-bold text-gray-900 mb-6">Available Rooms</h2>
-              <div className="space-y-4">
-                {hotel.rooms.map((room) => (
-                  <div
-                    key={room._id}
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Chambres Disponibles</h2>
+                <div className="space-y-4">
+                  {hotel.rooms.map((room) => (
+                    <div
+                      key={room._id}
                       className={`border-2 rounded-xl p-6 cursor-pointer transition-all duration-200 ${
-                      selectedRoom?._id === room._id
+                        selectedRoom?._id === room._id
                           ? "border-primary-500 bg-primary-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                    onClick={() => setSelectedRoom(room)}
-                  >
+                          : "border-gray-200 hover:border-gray-300"
+                      } ${!room.isAvailable ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      onClick={() => room.isAvailable && setSelectedRoom(room)}
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex-1">
-                          <h3 className="text-xl font-semibold text-gray-900 mb-2">{room.type}</h3>
+                          <div className="flex items-center gap-3 mb-2">
+                            <h3 className="text-xl font-semibold text-gray-900">{room.type}</h3>
+                            {room.isAvailable ? (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                Disponible
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                Indisponible
+                              </span>
+                            )}
+                          </div>
                           <p className="text-gray-600 mb-3">{room.description}</p>
                           <div className="flex items-center space-x-4 text-sm text-gray-600">
                             <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-1" />
-                              <span>Up to {room.maxGuests} guests</span>
+                              <Users className="h-4 w-4 mr-1" />
+                              <span>Jusqu'à {room.maxGuests} personnes</span>
                             </div>
                             <div className="flex items-center">
                               <Bed className="h-4 w-4 mr-1" />
-                              <span>King bed</span>
+                              <span>Lit king-size</span>
                             </div>
                             <div className="flex items-center">
                               <Bath className="h-4 w-4 mr-1" />
-                              <span>Private bathroom</span>
+                              <span>Salle de bain privée</span>
                             </div>
                           </div>
                         </div>
                         <div className="text-right ml-6">
-                          <div className="text-2xl font-bold text-primary-600">${room.pricePerNight}</div>
-                          <div className="text-gray-600">per night</div>
-                          <div className="text-sm text-gray-500 mt-1">{room.quantity} rooms available</div>
+                          <div className="text-2xl font-bold text-primary-600">{formatCurrencyMAD(room.pricePerNight)}</div>
+                          <div className="text-gray-600">par nuit</div>
+                          <div className="text-sm text-gray-500 mt-1">
+                            {room.quantity || room.availableQuantity || 0} chambres disponibles
+                          </div>
                         </div>
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl shadow-soft p-8 border border-gray-100">
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Bed className="h-8 w-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Aucune chambre disponible</h3>
+                  <p className="text-gray-600">
+                    Cet hôtel n'a pas encore de chambres configurées ou toutes les chambres sont actuellement indisponibles.
+                  </p>
                 </div>
               </div>
             )}
@@ -440,9 +545,9 @@ const HotelDetails = () => {
               <div className="bg-white rounded-2xl shadow-hard p-8 border border-gray-100">
                 <div className="text-center mb-6">
                   <div className="text-3xl font-bold text-primary-600 mb-1">
-                    ${selectedRoom?.pricePerNight || hotel.pricePerNight}
+                    {formatCurrencyMAD(selectedRoom?.pricePerNight || hotel.pricePerNight)}
                   </div>
-                  <div className="text-gray-600">per night</div>
+                  <div className="text-gray-600">par nuit</div>
                 </div>
 
                 <div className="space-y-4 mb-6">
@@ -498,22 +603,22 @@ const HotelDetails = () => {
                 {/* Price Breakdown */}
                 {bookingData.checkIn && bookingData.checkOut && (
                   <div className="border-t border-gray-200 pt-6 mb-6">
-                    <h3 className="font-semibold text-gray-900 mb-4">Price Breakdown</h3>
+                    <h3 className="font-semibold text-gray-900 mb-4">Détails du prix</h3>
                     <div className="space-y-2 text-sm">
                       <div className="flex justify-between">
                         <span className="text-gray-600">
-                          ${pricing.roomPrice} × {pricing.nights} night{pricing.nights > 1 ? "s" : ""}
+                          {formatCurrencyMAD(pricing.roomPrice)} × {pricing.nights} nuit{pricing.nights > 1 ? "s" : ""}
                       </span>
-                        <span className="text-gray-900">${pricing.subtotal.toFixed(2)}</span>
+                        <span className="text-gray-900">{formatCurrencyMAD(pricing.subtotal)}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Taxes & fees</span>
-                        <span className="text-gray-900">${pricing.taxes.toFixed(2)}</span>
+                        <span className="text-gray-600">Taxes & frais</span>
+                        <span className="text-gray-900">{formatCurrencyMAD(pricing.taxes)}</span>
                       </div>
                       <div className="border-t border-gray-200 pt-2 mt-2">
                         <div className="flex justify-between font-semibold text-lg">
                           <span className="text-gray-900">Total</span>
-                          <span className="text-primary-600">${pricing.total.toFixed(2)}</span>
+                          <span className="text-primary-600">{formatCurrencyMAD(pricing.total)}</span>
                         </div>
                     </div>
                     </div>

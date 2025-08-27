@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from "react"
 import { Link, useNavigate } from "react-router-dom"
 import { Heart, MapPin, Star, Trash2 } from "lucide-react"
 import HotelIllustration from "../data/Hotel.svg"
+import axios from "axios"
+import { formatCurrencyMAD } from "../utils/helpers"
 
 const Favorites = () => {
   const [favorites, setFavorites] = useState([])
@@ -43,7 +45,26 @@ const Favorites = () => {
         localStorage.setItem("favorites", JSON.stringify(defaults))
         setFavorites(defaults)
       } else {
-        setFavorites(parsed)
+        // Si ce sont des IDs bruts, essayer de récupérer les détails depuis le backend
+        const isIdArray = parsed.every((f) => typeof f === 'string')
+        if (isIdArray) {
+          Promise.all(parsed.map((id) => axios.get(`http://localhost:5000/api/hotels/${id}`).then(r => r.data.hotel).catch(() => null)))
+            .then((hotels) => {
+              const mapped = hotels.filter(Boolean).map((h) => ({
+                id: h._id,
+                name: h.name,
+                image: h.images?.[0] || HotelIllustration,
+                location: h.location,
+                pricePerNight: h.pricePerNight,
+                rating: h.rating,
+              }))
+              setFavorites(mapped)
+              localStorage.setItem("favorites", JSON.stringify(mapped))
+            })
+            .catch(() => setFavorites([]))
+        } else {
+          setFavorites(parsed)
+        }
       }
     } catch (e) {
       setFavorites([])
@@ -115,7 +136,7 @@ const Favorites = () => {
                   <div className="mt-4 flex items-center justify-between">
                     <div>
                       {hotel.pricePerNight ? (
-                        <p className="text-gray-900 font-semibold">{hotel.pricePerNight} € <span className="text-sm text-gray-500">/ nuit</span></p>
+                        <p className="text-gray-900 font-semibold">{formatCurrencyMAD(hotel.pricePerNight)} <span className="text-sm text-gray-500">/ nuit</span></p>
                       ) : (
                         <p className="text-gray-500 text-sm">Prix non disponible</p>
                       )}
