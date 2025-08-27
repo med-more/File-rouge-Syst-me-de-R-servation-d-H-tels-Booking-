@@ -397,6 +397,7 @@ exports.updateHotel = async (req, res) => {
 exports.deleteHotel = async (req, res) => {
   try {
     const { id } = req.params;
+    const { force = false } = req.query;
     
     // Vérifier s'il y a des réservations actives
     const activeBookings = await Booking.countDocuments({
@@ -404,9 +405,11 @@ exports.deleteHotel = async (req, res) => {
       status: { $in: ['confirmed', 'pending'] }
     });
     
-    if (activeBookings > 0) {
+    if (activeBookings > 0 && !force) {
       return res.status(400).json({
-        message: `Cannot delete hotel with ${activeBookings} active bookings`
+        message: `Cannot delete hotel with ${activeBookings} active bookings. Use ?force=true to force deletion.`,
+        activeBookings,
+        code: 'ACTIVE_BOOKINGS_EXIST'
       });
     }
     
@@ -419,8 +422,16 @@ exports.deleteHotel = async (req, res) => {
     // Supprimer aussi toutes les chambres associées
     await Room.deleteMany({ hotelId: id });
     
+    // Si suppression forcée, annuler toutes les réservations actives
+    if (force && activeBookings > 0) {
+      await Booking.updateMany(
+        { hotelId: id, status: { $in: ['confirmed', 'pending'] } },
+        { status: 'cancelled', cancellationReason: 'Hotel deleted by admin' }
+      );
+    }
+    
     res.json({
-      message: 'Hotel deleted successfully'
+      message: force ? `Hotel deleted successfully. ${activeBookings} active bookings were cancelled.` : 'Hotel deleted successfully'
     });
   } catch (error) {
     console.error('Delete hotel error:', error);

@@ -267,6 +267,7 @@ exports.createRoom = async (req, res) => {
   try {
     const {
       hotelId,
+      name,
       type,
       description,
       pricePerNight,
@@ -283,6 +284,7 @@ exports.createRoom = async (req, res) => {
 
     const room = new Room({
       hotelId,
+      name,
       type,
       description,
       pricePerNight,
@@ -295,6 +297,7 @@ exports.createRoom = async (req, res) => {
     await room.save();
 
     const roomForHotel = {
+      name,
       type,
       description,
       pricePerNight,
