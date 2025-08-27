@@ -49,6 +49,7 @@ const ManageHotels = () => {
   const [selectedHotel, setSelectedHotel] = useState(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [filterLocation, setFilterLocation] = useState("")
+  const [filterRating, setFilterRating] = useState("")
   const [selectedImages, setSelectedImages] = useState([])
   const [imagePreview, setImagePreview] = useState([])
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -84,7 +85,9 @@ const ManageHotels = () => {
 
   const handleImageChange = (event) => {
     const files = Array.from(event.target.files)
-    setSelectedImages(files)
+    // Concaténer avec les images déjà sélectionnées
+    const newSelected = [...selectedImages, ...files]
+    setSelectedImages(newSelected)
 
     // Convertir en Data URLs (base64) pour sauvegarde JSON
     const readers = files.map(
@@ -95,7 +98,12 @@ const ManageHotels = () => {
           reader.readAsDataURL(file)
         })
     )
-    Promise.all(readers).then((results) => setImagePreview(results))
+    Promise.all(readers).then((results) => setImagePreview((prev) => [...prev, ...results]))
+  }
+
+  const handleRemoveImage = (indexToRemove) => {
+    setImagePreview((prev) => prev.filter((_, i) => i !== indexToRemove))
+    setSelectedImages((prev) => prev.filter((_, i) => i !== indexToRemove))
   }
 
   const handleSubmit = async (values, { setSubmitting, resetForm }) => {
@@ -200,8 +208,14 @@ const ManageHotels = () => {
     setModalType(type)
     setSelectedHotel(hotel)
     setShowModal(true)
-    setSelectedImages([])
-    setImagePreview([])
+    // Pré-remplir les images existantes en mode édition/affichage
+    if (type === 'edit' && hotel) {
+      setSelectedImages([])
+      setImagePreview(Array.isArray(hotel.images) ? hotel.images : [])
+    } else {
+      setSelectedImages([])
+      setImagePreview([])
+    }
   }
 
   const filteredHotels = hotels?.filter((hotel) => {
@@ -209,7 +223,8 @@ const ManageHotels = () => {
       hotel.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       hotel.location.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesLocation = !filterLocation || hotel.location.toLowerCase().includes(filterLocation.toLowerCase())
-    return matchesSearch && matchesLocation
+    const matchesRating = !filterRating || Number(hotel.rating) >= Number(filterRating)
+    return matchesSearch && matchesLocation && matchesRating
   }) || []
 
   return (
@@ -237,7 +252,7 @@ const ManageHotels = () => {
 
         {/* Filters */}
           <div className="bg-white/80 backdrop-blur rounded-2xl shadow-xl border-2 border-blue-200/30 p-6 mb-8 animate-fade-in-up">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
               <input
@@ -257,6 +272,20 @@ const ManageHotels = () => {
                 onChange={(e) => setFilterLocation(e.target.value)}
                 className="input-field pl-10"
               />
+            </div>
+            <div>
+              <select
+                value={filterRating}
+                onChange={(e) => setFilterRating(e.target.value)}
+                className="input-field"
+              >
+                <option value="">All ratings</option>
+                <option value="5">★ 5+</option>
+                <option value="4">★ 4+</option>
+                <option value="3">★ 3+</option>
+                <option value="2">★ 2+</option>
+                <option value="1">★ 1+</option>
+              </select>
             </div>
               <div className="flex items-center text-sm text-blue-700 font-semibold">
               <Filter className="h-4 w-4 mr-2" />
@@ -464,12 +493,16 @@ const ManageHotels = () => {
                           {imagePreview.length > 0 && (
                                 <div className="grid grid-cols-3 gap-2 mt-2">
                               {imagePreview.map((preview, index) => (
-                                <img
-                                  key={index}
-                                  src={preview || "/placeholder.svg"}
-                                  alt={`Preview ${index + 1}`}
-                                      className="w-full h-14 object-cover rounded-lg border border-blue-200 shadow animate-fade-in"
-                                />
+                                <div key={index} className="relative w-14 h-14 rounded-lg border border-blue-200 shadow flex items-center justify-center bg-white">
+                                  <img src={preview} alt={`Preview ${index + 1}`} className="w-full h-full object-cover rounded-lg" />
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveImage(index)}
+                                    className="absolute top-0 right-0 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </button>
+                                </div>
                               ))}
                             </div>
                           )}
