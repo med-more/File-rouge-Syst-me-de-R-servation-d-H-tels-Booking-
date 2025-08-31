@@ -27,6 +27,7 @@ import axios from "axios"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
 import { useAuth } from "../contexts/AuthContext"
+import { formatCurrencyMAD } from "../utils/helpers"
 import DatePicker from "react-datepicker"
 import "react-datepicker/dist/react-datepicker.css"
 import { format } from "date-fns"
@@ -43,6 +44,14 @@ const Home = () => {
   })
   const [featuredHotels, setFeaturedHotels] = useState([])
   const [loading, setLoading] = useState(true)
+  const [stats, setStats] = useState({
+    totalHotels: "50K+",
+    totalRooms: "100K+",
+    averageRating: "4.8",
+    totalCountries: "200+",
+    happyCustomers: "2M+"
+  })
+  const [popularDestinations, setPopularDestinations] = useState([])
   const { isAuthenticated } = useAuth()
   const [citySuggestions, setCitySuggestions] = useState([])
   const [showCitySuggestions, setShowCitySuggestions] = useState(false)
@@ -95,17 +104,46 @@ const Home = () => {
 
   useEffect(() => {
     fetchFeaturedHotels()
+    fetchStats()
+    fetchPopularDestinations()
   }, [])
 
   const fetchFeaturedHotels = async () => {
     try {
-      const response = await axios.get("/api/hotels/featured")
+      const response = await axios.get("http://localhost:5000/api/hotels/featured")
       setFeaturedHotels(response.data && response.data.hotels ? response.data.hotels : [])
     } catch (error) {
       console.error("Error fetching featured hotels:", error)
-      setFeaturedHotels([]) // Ensure featuredHotels is an array even on error
+      setFeaturedHotels([]) 
     } finally {
       setLoading(false)
+    }
+  }
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/stats")
+      if (response.data && response.data.stats) {
+        setStats({
+          totalHotels: response.data.stats.totalHotels > 1000 ? `${(response.data.stats.totalHotels / 1000).toFixed(0)}K+` : `${response.data.stats.totalHotels}+`,
+          totalRooms: response.data.stats.totalRooms > 1000 ? `${(response.data.stats.totalRooms / 1000).toFixed(0)}K+` : `${response.data.stats.totalRooms}+`,
+          averageRating: response.data.stats.averageRating.toFixed(1),
+          totalCountries: `${response.data.stats.totalCountries}+`,
+          happyCustomers: response.data.stats.happyCustomers
+        })
+      }
+    } catch (error) {
+      console.error("Error fetching stats:", error)
+    }
+  }
+
+  const fetchPopularDestinations = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/destinations/popular")
+      setPopularDestinations(response.data && response.data.destinations ? response.data.destinations : [])
+    } catch (error) {
+      console.error("Error fetching popular destinations:", error)
+      setPopularDestinations([])
     }
   }
 
@@ -133,44 +171,11 @@ const Home = () => {
     setShowCitySuggestions(false)
   }
 
-  const stats = [
+  const statsData = [
     { number: "2M+", label: "Happy Customers" },
     { number: "50K+", label: "Hotels Worldwide" },
     { number: "200+", label: "Countries" },
     { number: "4.8", label: "Average Rating" },
-  ]
-
-  const popularDestinations = [
-    {
-      name: "Paris",
-      properties: "2,000+ properties",
-      image: "https://placehold.co/400x300?text=Paris",
-    },
-    {
-      name: "New York",
-      properties: "1,500+ properties",
-      image: "https://placehold.co/400x300?text=New+York",
-    },
-    {
-      name: "London",
-      properties: "1,800+ properties",
-      image: "https://placehold.co/400x300?text=London",
-    },
-    {
-      name: "Tokyo",
-      properties: "1,200+ properties",
-      image: "https://placehold.co/400x300?text=Tokyo",
-    },
-    {
-      name: "Dubai",
-      properties: "900+ properties",
-      image: "https://placehold.co/400x300?text=Dubai",
-    },
-    {
-      name: "Rome",
-      properties: "1,100+ properties",
-      image: "https://placehold.co/400x300?text=Rome",
-    },
   ]
 
   const trendingDestinations = [
@@ -259,7 +264,6 @@ const Home = () => {
   return (
     <Fragment>
       <div className="min-h-screen relative overflow-hidden">
-        {/* Background Spots - Matching Login Page */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
           <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -537,7 +541,7 @@ const Home = () => {
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-yellow-400 to-yellow-500 rounded-2xl mx-auto mb-4 shadow-lg">
                   <Users className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-4xl font-bold text-gray-800 mb-2">2M+</h3>
+                <h3 className="text-4xl font-bold text-gray-800 mb-2">{stats.happyCustomers}</h3>
                 <p className="text-gray-600 font-medium">Happy Customers</p>
               </div>
 
@@ -546,7 +550,7 @@ const Home = () => {
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl mx-auto mb-4 shadow-lg">
                   <Building2 className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-4xl font-bold text-gray-800 mb-2">50K+</h3>
+                <h3 className="text-4xl font-bold text-gray-800 mb-2">{stats.totalHotels}</h3>
                 <p className="text-gray-600 font-medium">Hotels Worldwide</p>
               </div>
 
@@ -555,7 +559,7 @@ const Home = () => {
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl mx-auto mb-4 shadow-lg">
                   <Globe className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-4xl font-bold text-gray-800 mb-2">200+</h3>
+                <h3 className="text-4xl font-bold text-gray-800 mb-2">{stats.totalCountries}</h3>
                 <p className="text-gray-600 font-medium">Countries</p>
               </div>
 
@@ -564,7 +568,7 @@ const Home = () => {
                 <div className="flex items-center justify-center w-16 h-16 bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl mx-auto mb-4 shadow-lg">
                   <Star className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-4xl font-bold text-gray-800 mb-2">4.8</h3>
+                <h3 className="text-4xl font-bold text-gray-800 mb-2">{stats.averageRating}</h3>
                 <p className="text-gray-600 font-medium">Average Rating</p>
               </div>
             </div>
@@ -580,91 +584,55 @@ const Home = () => {
                 <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-primary-600"></div>
               </div>
             ) : (featuredHotels || []).length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
                 {(featuredHotels || []).map((hotel) => (
                   <Link
                     key={hotel._id}
                     to={`/hotels/${hotel._id}`}
-                    className="group relative bg-white rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.03] border-2 border-transparent hover:border-yellow-200 overflow-hidden"
+                    className="group relative bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-gray-100 overflow-hidden"
                   >
-                    {/* Gradient Border Effect */}
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 to-yellow-500 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 -z-10"></div>
-                    <div className="absolute inset-[2px] bg-white rounded-3xl z-0"></div>
-
-                    <div className="relative z-10">
-                      <div className="relative overflow-hidden rounded-t-3xl">
+                    <div className="relative">
+                      <div className="relative overflow-hidden rounded-t-xl">
                         <img
-                          src={hotel.images[0] || "/placeholder.svg"}
+                          src={hotel.images && hotel.images.length > 0 ? hotel.images[0] : "https://placehold.co/400x300?text=Hotel"}
                           alt={hotel.name}
-                          className="w-full h-64 object-cover transform group-hover:scale-110 transition-transform duration-700"
+                          className="w-full h-32 object-cover transform group-hover:scale-105 transition-transform duration-300"
+                          onError={(e) => {
+                            e.currentTarget.src = "https://placehold.co/400x300?text=Hotel"
+                          }}
                         />
-                        {/* Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-
-                        {/* Heart Icon */}
-                        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-md rounded-full p-3 shadow-lg transform group-hover:scale-110 transition-transform duration-300">
-                          <Heart className="w-5 h-5 text-gray-600 hover:text-red-500 transition-colors cursor-pointer" />
-                        </div>
-
-                        {/* Featured Badge */}
-                        <div className="absolute bottom-4 left-4">
-                          <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 px-4 py-2 rounded-full text-sm font-bold shadow-lg flex items-center space-x-2">
-                            <Star className="w-4 h-4 fill-current" />
-                            <span>Featured</span>
-                          </div>
-                        </div>
-
-                        {/* Rating Badge */}
-                        <div className="absolute top-4 left-4">
-                          <div className="bg-gradient-to-r from-green-500 to-green-600 text-white px-3 py-1 rounded-full text-sm font-bold shadow-lg flex items-center space-x-1">
-                            <Star className="w-4 h-4 fill-current" />
+                        {/* Rating Badge - Small and modern */}
+                        <div className="absolute top-2 right-2">
+                          <div className="bg-white/90 backdrop-blur-sm text-gray-800 px-2 py-1 rounded-full text-xs font-semibold shadow-sm flex items-center space-x-1">
+                            <Star className="w-3 h-3 fill-current text-yellow-500" />
                             <span>{hotel.rating}</span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="p-6 bg-gradient-to-b from-white via-gray-50/50 to-white">
-                        <div className="mb-4">
-                          <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors leading-tight mb-2">
+                      <div className="p-3">
+                        <div className="mb-2">
+                          <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors leading-tight mb-1 line-clamp-1">
                             {hotel.name}
                           </h3>
-                          <div className="flex items-center text-gray-600">
-                            <MapPin className="w-4 h-4 mr-2 text-blue-500" />
-                            <span className="text-sm">{hotel.location}</span>
+                          <div className="flex items-center text-gray-500 mb-2">
+                            <MapPin className="w-3 h-3 mr-1 text-blue-500" />
+                            <span className="text-xs line-clamp-1">{hotel.location}</span>
                           </div>
                         </div>
 
-                        {/* Amenities */}
-                        <div className="flex items-center justify-center space-x-2 mb-4">
-                          <div className="flex items-center bg-gradient-to-r from-blue-50 to-blue-100 px-3 py-2 rounded-full border border-blue-200">
-                            <Wifi className="w-4 h-4 mr-1 text-blue-600" />
-                            <span className="text-xs text-blue-700 font-medium">WiFi</span>
-                          </div>
-                          <div className="flex items-center bg-gradient-to-r from-green-50 to-green-100 px-3 py-2 rounded-full border border-green-200">
-                            <Car className="w-4 h-4 mr-1 text-green-600" />
-                            <span className="text-xs text-green-700 font-medium">Parking</span>
-                          </div>
-                          <div className="flex items-center bg-gradient-to-r from-yellow-50 to-yellow-100 px-3 py-2 rounded-full border border-yellow-200">
-                            <Coffee className="w-4 h-4 mr-1 text-yellow-600" />
-                            <span className="text-xs text-yellow-700 font-medium">Breakfast</span>
-                          </div>
-                        </div>
-
-                        {/* Price and Reviews */}
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                          <div className="text-center">
-                            <p className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                              ${hotel.pricePerNight}
+                        {/* Price */}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-lg font-bold text-blue-600">
+                              {formatCurrencyMAD(hotel.pricePerNight)}
                             </p>
-                            <p className="text-sm text-gray-500 font-medium">per night</p>
+                            <p className="text-xs text-gray-500">/ nuit</p>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-600 font-medium">
-                              {(Math.random() * 500 + 100).toFixed(0)} reviews
-                            </p>
-                            <p className="text-xs text-green-600 font-bold bg-green-50 px-2 py-1 rounded-full">
-                              Free cancellation
-                            </p>
+                          <div className="text-right text-xs text-gray-400">
+                            <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">
+                              Voir
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -689,46 +657,56 @@ const Home = () => {
         <section className="section-padding relative z-10">
           <div className="container-custom">
             <h2 className="heading-lg text-center mb-12">Popular Destinations</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {popularDestinations.map((destination, index) => (
                 <Link
                   key={index}
                   to={`/hotels?location=${destination.name}`}
-                  className="group relative bg-white rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.05] overflow-hidden"
+                  className="group relative bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-gray-100 overflow-hidden"
                 >
-                  {/* Animated Border */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-blue-500 via-purple-500 via-green-500 to-yellow-500 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-gradient-x"></div>
-                  <div className="absolute inset-[3px] bg-white rounded-3xl"></div>
-
-                  <div className="relative z-10">
-                    <div className="relative overflow-hidden rounded-t-3xl h-56">
+                  <div className="relative">
+                    <div className="relative overflow-hidden rounded-t-xl h-32">
                       <img
-                        src={destination.image || "/placeholder.svg"}
+                        src={`https://images.unsplash.com/photo-${Math.floor(Math.random() * 1000000)}?w=400&h=300&fit=crop&q=80`}
                         alt={destination.name}
-                        className="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-700"
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          const fallbackImages = {
+                            'Paris': 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400&h=300&fit=crop&q=80',
+                            'New York': 'https://images.unsplash.com/photo-1496442226666-8d4d0e62e6e9?w=400&h=300&fit=crop&q=80',
+                            'London': 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=400&h=300&fit=crop&q=80',
+                            'Tokyo': 'https://images.unsplash.com/photo-1540959733332-eab4deabeeaf?w=400&h=300&fit=crop&q=80',
+                            'Dubai': 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=400&h=300&fit=crop&q=80',
+                            'Rome': 'https://images.unsplash.com/photo-1552832230-cb7e50c4b6c9?w=400&h=300&fit=crop&q=80'
+                          }
+                          e.currentTarget.src = fallbackImages[destination.name] || 'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=400&h=300&fit=crop&q=80'
+                        }}
                       />
+                      {/* Popular Badge */}
+                      <div className="absolute top-2 right-2">
+                        <div className="bg-yellow-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-sm">
+                          Popular
+                        </div>
+                      </div>
+                    </div>
 
-                      {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-
-                      {/* Content Overlay */}
-                      <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
-                        <h3 className="text-2xl font-bold mb-2 group-hover:text-yellow-300 transition-colors transform group-hover:scale-105 duration-300">
+                    <div className="p-3">
+                      <div className="mb-2">
+                        <h3 className="text-sm font-semibold text-gray-900 group-hover:text-blue-600 transition-colors leading-tight mb-1 line-clamp-1">
                           {destination.name}
                         </h3>
-                        <div className="flex items-center justify-between">
-                          <p className="text-white/90 text-sm font-medium bg-black/30 px-3 py-1 rounded-full backdrop-blur-sm">
-                            {destination.properties}
-                          </p>
-                          <div className="bg-gradient-to-r from-yellow-400 to-yellow-500 text-gray-900 px-3 py-1 rounded-full text-xs font-bold">
-                            Popular
-                          </div>
+                        <div className="flex items-center text-gray-500 mb-2">
+                          <MapPin className="w-3 h-3 mr-1 text-blue-500" />
+                          <span className="text-xs line-clamp-1">{destination.properties}</span>
                         </div>
                       </div>
 
-                      {/* Floating Elements */}
-                      <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <MapPin className="w-5 h-5 text-white" />
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-gray-400">
+                          <div className="bg-blue-50 text-blue-600 px-2 py-1 rounded-full font-medium">
+                            Explorer
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -742,66 +720,55 @@ const Home = () => {
         <section className="section-padding relative z-10">
           <div className="container-custom">
             <h2 className="heading-lg text-center mb-12">Trending Destinations</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
               {trendingDestinations.map((destination, index) => (
                 <Link
                   key={index}
                   to={`/hotels?location=${destination.name}`}
-                  className="group relative bg-white rounded-3xl shadow-2xl hover:shadow-3xl transition-all duration-500 transform hover:scale-[1.08] overflow-hidden"
+                  className="group relative bg-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105 border border-gray-100 overflow-hidden"
                 >
-                  {/* Pulsing Border Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-red-500 via-pink-500 to-orange-500 rounded-3xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 animate-pulse"></div>
-                  <div className="absolute inset-[2px] bg-white rounded-3xl"></div>
-
-                  <div className="relative z-10">
-                    <div className="relative overflow-hidden rounded-t-3xl h-48">
+                  <div className="relative">
+                    <div className="relative overflow-hidden rounded-t-xl h-32">
                       <img
                         src={destination.image || "/placeholder.svg"}
                         alt={destination.name}
-                        className="w-full h-full object-cover transform group-hover:scale-125 transition-transform duration-700"
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-300"
+                        onError={(e) => {
+                          const fallbackImages = {
+                            'Marrakech': 'https://images.unsplash.com/photo-1596422846543-75c6fc197f11?w=400&h=300&fit=crop&q=80',
+                            'Casablanca': 'https://images.unsplash.com/photo-1560169897-fc0cdbdfa4d5?w=400&h=300&fit=crop&q=80',
+                            'Tangier': 'https://images.unsplash.com/photo-1591456983933-0c264720bcd3?w=400&h=300&fit=crop&q=80',
+                            'Paris': 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=400&h=300&fit=crop&q=80',
+                            'Madrid': 'https://images.unsplash.com/photo-1543783207-ec64e4d95325?w=400&h=300&fit=crop&q=80'
+                          }
+                          e.currentTarget.src = fallbackImages[destination.name] || 'https://images.unsplash.com/photo-1506929562872-bb421503ef21?w=400&h=300&fit=crop&q=80'
+                        }}
                       />
-
-                      {/* Dynamic Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-red-900/70 via-transparent to-transparent group-hover:from-red-900/90 transition-all duration-300"></div>
-
                       {/* Trending Badge */}
-                      <div className="absolute top-4 right-4 transform group-hover:scale-110 transition-transform duration-300">
-                        <div className="bg-gradient-to-r from-red-500 to-red-600 text-white px-3 py-2 rounded-full text-xs font-bold shadow-lg flex items-center space-x-1 animate-bounce">
+                      <div className="absolute top-2 right-2">
+                        <div className="bg-red-500 text-white px-2 py-1 rounded-full text-xs font-semibold shadow-sm flex items-center space-x-1">
                           <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                           <span>Trending</span>
                         </div>
                       </div>
-
-                      {/* Fire Icon */}
-                      <div className="absolute top-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                        <div className="bg-orange-500 text-white p-2 rounded-full shadow-lg">
-                          <div className="w-4 h-4 bg-yellow-400 rounded-full animate-pulse"></div>
-                        </div>
-                      </div>
                     </div>
 
-                    <div className="p-5 bg-gradient-to-b from-white via-red-50/30 to-white">
-                      <h3 className="text-lg font-bold text-gray-900 mb-2 group-hover:text-red-600 transition-colors">
-                        {destination.name}
-                      </h3>
-                      <p className="text-gray-600 text-sm leading-relaxed group-hover:text-gray-700 transition-colors">
-                        {destination.description}
-                      </p>
+                    <div className="p-3">
+                      <div className="mb-2">
+                        <h3 className="text-sm font-semibold text-gray-900 group-hover:text-red-600 transition-colors leading-tight mb-1 line-clamp-1">
+                          {destination.name}
+                        </h3>
+                        <p className="text-gray-600 text-xs leading-relaxed group-hover:text-gray-700 transition-colors line-clamp-2">
+                          {destination.description}
+                        </p>
+                      </div>
 
-                      {/* Trending Indicator */}
-                      <div className="mt-3 flex items-center justify-between">
-                        <div className="flex items-center space-x-1">
-                          <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                          <div
-                            className="w-2 h-2 bg-orange-500 rounded-full animate-pulse"
-                            style={{ animationDelay: "0.2s" }}
-                          ></div>
-                          <div
-                            className="w-2 h-2 bg-yellow-500 rounded-full animate-pulse"
-                            style={{ animationDelay: "0.4s" }}
-                          ></div>
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs text-gray-400">
+                          <div className="bg-red-50 text-red-600 px-2 py-1 rounded-full font-medium">
+                            Découvrir
+                          </div>
                         </div>
-                        <span className="text-xs text-red-600 font-bold bg-red-50 px-2 py-1 rounded-full">Hot!</span>
                       </div>
                     </div>
                   </div>
@@ -817,34 +784,33 @@ const Home = () => {
             <h2 className="heading-lg text-center mb-12">Browse by Property Type</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-8">
               {propertyTypes.map((type, index) => {
-                // Use the project's existing color scheme
                 const colors = [
-                  "bg-blue-500", // Hotels - Blue
-                  "bg-yellow-500", // Apartments - Yellow
-                  "bg-green-500", // Resorts - Green
-                  "bg-purple-500", // Villas - Purple
-                  "bg-blue-600", // Guest Houses - Darker Blue
+                  "bg-blue-500",
+                  "bg-yellow-500", 
+                  "bg-green-500", 
+                  "bg-purple-500", 
+                  "bg-blue-600", 
                 ]
                 const textColors = [
-                  "text-blue-600", // Hotels
-                  "text-yellow-600", // Apartments
-                  "text-green-600", // Resorts
-                  "text-purple-600", // Villas
-                  "text-blue-700", // Guest Houses
+                  "text-blue-600", 
+                  "text-yellow-600", 
+                  "text-green-600", 
+                  "text-purple-600", 
+                  "text-blue-700", 
                 ]
                 const bgColors = [
-                  "bg-blue-50", // Hotels
-                  "bg-yellow-50", // Apartments
-                  "bg-green-50", // Resorts
-                  "bg-purple-50", // Villas
-                  "bg-blue-100", // Guest Houses
+                  "bg-blue-50", 
+                  "bg-yellow-50", 
+                  "bg-green-50", 
+                  "bg-purple-50", 
+                  "bg-blue-100", 
                 ]
                 const borderColors = [
-                  "border-blue-200", // Hotels
-                  "border-yellow-200", // Apartments
-                  "border-green-200", // Resorts
-                  "border-purple-200", // Villas
-                  "border-blue-300", // Guest Houses
+                  "border-blue-200", 
+                  "border-yellow-200", 
+                  "border-green-200", 
+                  "border-purple-200", 
+                  "border-blue-300", 
                 ]
 
                 return (
