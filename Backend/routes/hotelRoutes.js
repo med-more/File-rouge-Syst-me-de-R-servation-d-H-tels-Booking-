@@ -14,6 +14,9 @@ const handleValidation = (req, res, next) => {
 
 router.post('/hotels', createHotelValidation, handleValidation, hotelController.createHotel);
 router.get('/hotels', hotelController.getHotels);
+router.get('/hotels/featured', hotelController.getFeaturedHotels);
+router.get('/stats', hotelController.getStats);
+router.get('/destinations/popular', hotelController.getPopularDestinations);
 router.get('/hotels/:id', hotelController.getHotelById);
 router.put('/hotels/:id', createHotelValidation, handleValidation, hotelController.updateHotel);
 router.delete('/hotels/:id', hotelController.deleteHotel);
