@@ -194,15 +194,17 @@ const Navbar = () => {
                 </button>
 
                 {/* Favorites */}
-                <button
+                <Link
+                  to="/favorites"
                   className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 ${
                     scrolled
                       ? "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
                       : "text-white/90 hover:text-white hover:bg-white/10"
                   }`}
+                  title="Mes favoris"
                 >
                   <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
-                </button>
+                </Link>
 
                 {/* User Menu */}
                 <div className="relative">
@@ -212,15 +214,24 @@ const Navbar = () => {
                       scrolled ? "text-gray-700 hover:bg-gray-100" : "text-white hover:bg-white/10"
                     }`}
                   >
-                    <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
-                      isAdmin 
-                        ? "bg-gradient-to-r from-yellow-500 to-yellow-600" 
-                        : "bg-gradient-to-r from-primary-500 to-primary-600"
-                    }`}>
-                      <span className="text-white font-semibold text-xs sm:text-sm">
-                        {user?.name?.charAt(0)?.toUpperCase() || "U"}
-                      </span>
-                    </div>
+                    {user?.profileImage ? (
+                      <img
+                        src={user.profileImage}
+                        alt="avatar"
+                        className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-white/40"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center ${
+                        isAdmin 
+                          ? "bg-gradient-to-r from-yellow-500 to-yellow-600" 
+                          : "bg-gradient-to-r from-primary-500 to-primary-600"
+                      }`}>
+                        <span className="text-white font-semibold text-xs sm:text-sm">
+                          {user?.name?.charAt(0)?.toUpperCase() || "U"}
+                        </span>
+                      </div>
+                    )}
                     <div className="flex items-center space-x-1.5 sm:space-x-2">
                       <span className="font-medium text-sm sm:text-base hidden xl:block">{user?.name}</span>
                       {isAdmin && <Crown className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-yellow-400" />}
@@ -369,13 +380,22 @@ const Navbar = () => {
               {isAuthenticated ? (
                 <div className="border-t border-gray-200 pt-4 mt-4">
                   <div className="flex items-center px-3 py-3 mb-3">
-                    <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mr-3 ${
-                      isAdmin 
-                        ? "bg-gradient-to-r from-yellow-500 to-yellow-600" 
-                        : "bg-gradient-to-r from-primary-500 to-primary-600"
-                    }`}>
-                      <span className="text-white font-semibold text-sm sm:text-base">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
-                    </div>
+                    {user?.profileImage ? (
+                      <img
+                        src={user.profileImage}
+                        alt="avatar"
+                        className="w-9 h-9 sm:w-10 sm:h-10 rounded-full object-cover mr-3 border border-gray-200"
+                        onError={(e) => { e.currentTarget.style.display = 'none' }}
+                      />
+                    ) : (
+                      <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center mr-3 ${
+                        isAdmin 
+                          ? "bg-gradient-to-r from-yellow-500 to-yellow-600" 
+                          : "bg-gradient-to-r from-primary-500 to-primary-600"
+                      }`}>
+                        <span className="text-white font-semibold text-sm sm:text-base">{user?.name?.charAt(0)?.toUpperCase() || "U"}</span>
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center space-x-2">
                         <p className="text-sm font-medium text-gray-900 truncate">{user?.name}</p>

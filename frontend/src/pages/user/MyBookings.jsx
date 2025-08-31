@@ -18,7 +18,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import { useBooking } from "../../contexts/BookingContext"
-import { formatDate, formatCurrency } from "../../utils/helpers"
+import { formatDate, formatCurrencyMAD } from "../../utils/helpers"
 import axios from "axios"
 import { toast } from "react-toastify"
 
@@ -466,7 +466,7 @@ const MyBookings = () => {
                       </div>
                       <div>
                         <p className="text-sm text-gray-500">Prix total</p>
-                        <p className="font-medium">{formatCurrency(booking.totalPrice || booking.total)}</p>
+                        <p className="font-medium">{formatCurrencyMAD(booking.totalPrice || booking.total)}</p>
                       </div>
                     </div>
 
@@ -508,7 +508,7 @@ const MyBookings = () => {
                 <div className="text-sm text-gray-600 space-y-1">
                   <div>Check-in: {formatDate(selectedBooking.checkIn)}</div>
                   <div>Check-out: {formatDate(selectedBooking.checkOut)}</div>
-                  <div>Total: {formatCurrency(selectedBooking.totalPrice || selectedBooking.total)}</div>
+                  <div>Total: {formatCurrencyMAD(selectedBooking.totalPrice || selectedBooking.total)}</div>
                 </div>
               </div>
 

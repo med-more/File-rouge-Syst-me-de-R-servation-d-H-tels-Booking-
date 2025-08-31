@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Link, useNavigate, useLocation } from "react-router-dom"
 import { Formik, Form, Field, ErrorMessage } from "formik"
 import * as Yup from "yup"
-import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react"
+import { User, Mail, Lock, Eye, EyeOff, ArrowRight, AlertCircle, RefreshCw } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 import Lottie from "lottie-react"
 import loginAnimation from "../../data/login.json"
@@ -19,6 +19,8 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loginError, setLoginError] = useState("")
   const { login, isAuthenticated, isAdmin, loading } = useAuth()
+  const [pendingEmailVerification, setPendingEmailVerification] = useState("")
+  const [isResending, setIsResending] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -65,6 +67,9 @@ const Login = () => {
         console.error('Login failed:', errorMsg)
         setLoginError(errorMsg)
         setFieldError("email", errorMsg)
+        if (errorMsg?.includes('Email non vérifié')) {
+          setPendingEmailVerification(values.email)
+        }
       }
     } catch (error) {
       console.error('Login unexpected error:', error)
@@ -118,9 +123,44 @@ const Login = () => {
             </div>
 
             {loginError && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-center">
-                <AlertCircle className="h-5 w-5 mr-2" />
-                {loginError}
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg">
+                <div className="flex items-center">
+                  <AlertCircle className="h-5 w-5 mr-2" />
+                  <span>{loginError}</span>
+                </div>
+                {pendingEmailVerification && (
+                  <div className="mt-3 flex items-center justify-between">
+                    <span className="text-sm text-gray-700">Vous n'avez pas reçu le code ?</span>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          setIsResending(true)
+                          const res = await fetch('http://localhost:5000/api/auth/resend-verification', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: pendingEmailVerification })
+                          })
+                          if (!res.ok) throw new Error('Échec de l\'envoi')
+                          setLoginError('Nouveau code envoyé ! Vérifiez votre email.')
+                        } catch (e) {
+                          setLoginError('Impossible d\'envoyer le code. Réessayez plus tard.')
+                        } finally {
+                          setIsResending(false)
+                        }
+                      }}
+                      className="inline-flex items-center px-3 py-1.5 bg-yellow-100 text-yellow-800 text-xs font-semibold rounded hover:bg-yellow-200 transition-colors"
+                    >
+                      {isResending ? (
+                        <>
+                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" /> Envoi...
+                        </>
+                      ) : (
+                        'Renvoyer le code'
+                      )}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

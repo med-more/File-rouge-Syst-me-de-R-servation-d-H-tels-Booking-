@@ -166,7 +166,7 @@ export const AuthProvider = ({ children }) => {
       if (mode !== "auto-login") {
         toast.error(errorMessage)
       }
-      return { success: false, error: errorMessage }
+      return { success: false, error: errorMessage, code: error.response?.data?.code }
     } finally {
       dispatch({ type: "SET_LOADING", payload: false })
     }
@@ -224,7 +224,7 @@ export const AuthProvider = ({ children }) => {
 
   const updateProfile = async (userData) => {
     try {
-      const response = await axios.patch('http://localhost:5000/api/user/profile', userData, {
+      const response = await axios.patch('http://localhost:5000/api/profile', userData, {
         headers: { Authorization: `Bearer ${state.token}` }
       })
       
