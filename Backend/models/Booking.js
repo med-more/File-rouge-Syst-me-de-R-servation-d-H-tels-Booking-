@@ -223,26 +223,90 @@ bookingSchema.methods.getTotalGuests = function() {
 };
 
 bookingSchema.methods.canBeCancelled = function() {
-  if (this.status === 'cancelled') return false;
+  if (this.status === 'cancelled') {
+    return {
+      canCancel: false,
+      reason: 'Booking is already cancelled'
+    };
+  }
+  
+  if (this.status === 'completed') {
+    return {
+      canCancel: false,
+      reason: 'Cannot cancel completed bookings'
+    };
+  }
   
   const now = new Date();
   const checkIn = new Date(this.checkIn);
+  const daysUntilCheckIn = Math.ceil((checkIn - now) / (1000 * 60 * 60 * 24));
   
   switch (this.cancellationPolicy) {
     case 'free_cancellation':
-      return true;
+      return {
+        canCancel: true,
+        reason: 'Free cancellation available',
+        deadline: checkIn
+      };
+      
     case 'partial_refund':
-      return now < checkIn;
+      if (daysUntilCheckIn <= 0) {
+        return {
+          canCancel: false,
+          reason: 'Cancellation deadline has passed',
+          deadline: checkIn
+        };
+      } else if (daysUntilCheckIn <= 1) {
+        return {
+          canCancel: true,
+          reason: 'Cancellation allowed with 50% fee',
+          deadline: checkIn,
+          fee: this.finalPrice * 0.5
+        };
+      } else if (daysUntilCheckIn <= 2) {
+        return {
+          canCancel: true,
+          reason: 'Cancellation allowed with 25% fee',
+          deadline: checkIn,
+          fee: this.finalPrice * 0.25
+        };
+      } else {
+        return {
+          canCancel: true,
+          reason: 'Free cancellation available',
+          deadline: checkIn
+        };
+      }
+      
     case 'no_refund':
-      return false;
+      if (daysUntilCheckIn <= 3) {
+        return {
+          canCancel: false,
+          reason: 'No cancellation allowed within 72 hours',
+          deadline: new Date(checkIn.getTime() - (3 * 24 * 60 * 60 * 1000))
+        };
+      } else {
+        return {
+          canCancel: true,
+          reason: 'Cancellation allowed with 10% fee',
+          deadline: new Date(checkIn.getTime() - (3 * 24 * 60 * 60 * 1000)),
+          fee: this.finalPrice * 0.1
+        };
+      }
+      
     default:
-      return true;
+      return {
+        canCancel: true,
+        reason: 'Cancellation available',
+        deadline: checkIn
+      };
   }
 };
 
 bookingSchema.methods.cancelBooking = function(reason = '') {
-  if (!this.canBeCancelled()) {
-    throw new Error('Booking cannot be cancelled');
+  const cancellationCheck = this.canBeCancelled();
+  if (!cancellationCheck.canCancel) {
+    throw new Error(cancellationCheck.reason);
   }
   
   this.status = 'cancelled';

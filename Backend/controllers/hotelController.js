@@ -183,3 +183,85 @@ exports.getHotelAvailability = async (req, res) => {
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+exports.getFeaturedHotels = async (req, res) => {
+  try {
+    // Récupérer les hôtels avec un rating élevé (4.5+) et limiter à 6 hôtels
+    const featuredHotels = await Hotel.find({ rating: { $gte: 4.5 } })
+      .sort({ rating: -1, createdAt: -1 })
+      .limit(6);
+    
+    res.json({ hotels: featuredHotels });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getStats = async (req, res) => {
+  try {
+    const totalHotels = await Hotel.countDocuments();
+    const totalRooms = await Hotel.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalRooms: { $sum: { $size: "$rooms" } }
+        }
+      }
+    ]);
+    
+    const averageRating = await Hotel.aggregate([
+      {
+        $group: {
+          _id: null,
+          avgRating: { $avg: "$rating" }
+        }
+      }
+    ]);
+    
+    const stats = {
+      totalHotels: totalHotels || 0,
+      totalRooms: totalRooms[0]?.totalRooms || 0,
+      averageRating: averageRating[0]?.avgRating ? Math.round(averageRating[0].avgRating * 10) / 10 : 0,
+      totalCountries: 200, // Valeur statique pour l'instant
+      happyCustomers: "2M+" // Valeur statique pour l'instant
+    };
+    
+    res.json({ stats });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+exports.getPopularDestinations = async (req, res) => {
+  try {
+    const popularDestinations = await Hotel.aggregate([
+      {
+        $group: {
+          _id: "$location",
+          count: { $sum: 1 },
+          averageRating: { $avg: "$rating" },
+          averagePrice: { $avg: "$pricePerNight" }
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 6
+      },
+      {
+        $project: {
+          name: "$_id",
+          properties: { $concat: [{ $toString: "$count" }, "+ properties"] },
+          count: "$count",
+          averageRating: { $round: ["$averageRating", 1] },
+          averagePrice: { $round: ["$averagePrice", 0] }
+        }
+      }
+    ]);
+    
+    res.json({ destinations: popularDestinations });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

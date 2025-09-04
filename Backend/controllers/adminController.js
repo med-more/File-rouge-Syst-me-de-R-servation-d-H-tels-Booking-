@@ -5,13 +5,11 @@ const Booking = require('../models/Booking');
 
 exports.getDashboardStats = async (req, res) => {
   try {
-    // Statistiques générales
     const totalUsers = await User.countDocuments();
     const totalHotels = await Hotel.countDocuments();
     const totalRooms = await Room.countDocuments();
     const totalBookings = await Booking.countDocuments();
 
-    // Statistiques des utilisateurs
     const newUsersThisMonth = await User.countDocuments({
       createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
     });
@@ -20,16 +18,13 @@ exports.getDashboardStats = async (req, res) => {
       lastLoginAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
     });
 
-    // Statistiques des hôtels
     const activeHotels = await Hotel.countDocuments({ status: 'active' });
     const pendingHotels = await Hotel.countDocuments({ status: 'pending' });
 
-    // Statistiques des réservations
     const confirmedBookings = await Booking.countDocuments({ status: 'confirmed' });
     const pendingBookings = await Booking.countDocuments({ status: 'pending' });
     const cancelledBookings = await Booking.countDocuments({ status: 'cancelled' });
 
-    // Revenus
     const totalRevenue = await Booking.aggregate([
       { $match: { status: 'confirmed' } },
       { $group: { _id: null, total: { $sum: '$totalPrice' } } }
@@ -45,7 +40,6 @@ exports.getDashboardStats = async (req, res) => {
       { $group: { _id: null, total: { $sum: '$totalPrice' } } }
     ]);
 
-    // Réservations récentes
     const recentBookings = await Booking.find()
       .populate('userId', 'name email')
       .populate('hotelId', 'name')
@@ -53,19 +47,16 @@ exports.getDashboardStats = async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // Utilisateurs récents
     const recentUsers = await User.find()
       .select('name email createdAt')
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // Hôtels récents
     const recentHotels = await Hotel.find()
       .select('name location status createdAt')
       .sort({ createdAt: -1 })
       .limit(10);
 
-    // Statistiques par mois (12 derniers mois)
     const monthlyStats = await Booking.aggregate([
       {
         $match: {
@@ -85,7 +76,6 @@ exports.getDashboardStats = async (req, res) => {
       { $sort: { '_id.year': 1, '_id.month': 1 } }
     ]);
 
-    // Top hôtels par réservations
     const topHotels = await Booking.aggregate([
       { $match: { status: 'confirmed' } },
       {
@@ -169,7 +159,6 @@ exports.getHotels = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Construire le filtre
     const filter = {};
     
     if (search) {
