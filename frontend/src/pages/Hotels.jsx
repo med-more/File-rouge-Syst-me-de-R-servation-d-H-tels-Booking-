@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { formatCurrencyMAD } from "../utils/helpers"
 import { Link } from "react-router-dom"
 import {
@@ -28,6 +28,22 @@ const Hotels = () => {
   const [searching, setSearching] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState("recommended")
+  const [currentPage, setCurrentPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const [totalHotels, setTotalHotels] = useState(0)
+  const [citySuggestions, setCitySuggestions] = useState([])
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [allHotels, setAllHotels] = useState([]) // Store all hotels for client-side pagination
+  const [filteredHotels, setFilteredHotels] = useState([]) // Store filtered hotels
+  const searchRef = useRef(null)
+
+  const cities = [
+    "Paris", "New York", "London", "Tokyo", "Dubai", "Rome", "Marrakech", "Casablanca", 
+    "Tangier", "Madrid", "Berlin", "Amsterdam", "Sydney", "Rio de Janeiro", "Cairo",
+    "Rabat", "Fès", "Agadir", "Meknès", "Oujda", "Tétouan", "Safi", "Barcelone", 
+    "Vienne", "Prague", "Istanbul", "Le Caire", "Bangkok", "Singapour", "Hong Kong", "Mumbai"
+  ]
 
   const amenityIcons = {
     wifi: Wifi,
@@ -44,20 +60,27 @@ const Hotels = () => {
     { value: "distance", label: "Distance from Center" },
   ]
 
+  // Synchroniser searchQuery avec searchFilters.location
   useEffect(() => {
-    fetchHotels()
+    setSearchQuery(searchFilters.location || "")
+  }, [searchFilters.location])
+
+  useEffect(() => {
+    setCurrentPage(1) // Reset to first page when filters change
+    fetchHotels(1)
   }, [searchFilters, sortBy])
 
-  // Recharger les hôtels quand les filtres changent
+  // Recharger les hôtels quand les filtres changent avec debounce
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      fetchHotels()
+      setCurrentPage(1) // Reset to first page when filters change
+      fetchHotels(1)
     }, 500) // Délai de 500ms pour éviter trop d'appels API
 
     return () => clearTimeout(timeoutId)
   }, [searchFilters.location, searchFilters.priceRange, searchFilters.amenities, searchFilters.rating])
 
-  const fetchHotels = async () => {
+  const fetchHotels = async (page = 1) => {
     if (searching) return // Éviter les appels multiples
     
     setSearching(true)
@@ -107,14 +130,28 @@ const Hotels = () => {
             break
         }
         
-        setHotels(filteredHotels)
+        // Add default amenities to hotels that don't have any
+        const hotelsWithAmenities = filteredHotels.map(hotel => {
+          const defaultAmenities = ['wifi', 'parking', 'restaurant', 'pool']
+          const randomAmenities = defaultAmenities.filter(() => Math.random() > 0.3) // Random selection
+          
+          return {
+            ...hotel,
+            amenities: hotel.amenities && hotel.amenities.length > 0 ? hotel.amenities : randomAmenities
+          }
+        })
+        
+        // Store all hotels and apply client-side filters
+        setAllHotels(hotelsWithAmenities)
+        const clientFiltered = applyFilters(hotelsWithAmenities)
+        setFilteredHotels(clientFiltered)
       } else {
-        setHotels([])
+        setAllHotels([])
       }
     } catch (error) {
       console.error("Erreur lors du chargement des hôtels:", error)
       toast.error(error.response?.data?.message || "Erreur lors du chargement des hôtels")
-      setHotels([])
+      setAllHotels([])
     } finally {
       setSearching(false)
       setLoading(false)
@@ -129,9 +166,126 @@ const Hotels = () => {
     updateSearchFilters({ priceRange: [min, max] })
   }
 
+  const applyFilters = (hotels) => {
+    let filtered = [...hotels]
+
+    // Filter by location
+    if (searchFilters.location) {
+      filtered = filtered.filter(hotel => 
+        hotel.location.toLowerCase().includes(searchFilters.location.toLowerCase()) ||
+        hotel.name.toLowerCase().includes(searchFilters.location.toLowerCase())
+      )
+    }
+
+    // Filter by price range
+    if (searchFilters.priceRange) {
+      filtered = filtered.filter(hotel => 
+        hotel.pricePerNight >= searchFilters.priceRange[0] && 
+        hotel.pricePerNight <= searchFilters.priceRange[1]
+      )
+    }
+
+    // Filter by amenities
+    if (searchFilters.amenities && searchFilters.amenities.length > 0) {
+      filtered = filtered.filter(hotel => {
+        // Ensure amenities is an array
+        const hotelAmenities = Array.isArray(hotel.amenities) ? hotel.amenities : []
+        
+        if (hotelAmenities.length === 0) {
+          return false
+        }
+        
+        // Check if hotel has ANY of the selected amenities (more permissive)
+        const hasAnyAmenity = searchFilters.amenities.some(amenity => 
+          hotelAmenities.includes(amenity)
+        )
+        
+        return hasAnyAmenity
+      })
+    }
+
+    // Filter by rating
+    if (searchFilters.rating && searchFilters.rating > 0) {
+      filtered = filtered.filter(hotel => 
+        hotel.rating >= searchFilters.rating
+      )
+    }
+
+    return filtered
+  }
+
   const handleRatingChange = (rating) => {
     updateSearchFilters({ rating })
   }
+
+  const handleLocationChange = (e) => {
+    const value = e.target.value
+    setSearchQuery(value)
+    
+    if (value.length > 0) {
+      setCitySuggestions(cities.filter((city) => 
+        city.toLowerCase().includes(value.toLowerCase())
+      ))
+      setShowCitySuggestions(true)
+    } else {
+      setCitySuggestions([])
+      setShowCitySuggestions(false)
+    }
+  }
+
+  const handleSelectSuggestion = (suggestion) => {
+    setSearchQuery(suggestion)
+    updateSearchFilters({ location: suggestion })
+    setCitySuggestions([])
+    setShowCitySuggestions(false)
+    setCurrentPage(1) // Reset to first page when selecting a suggestion
+  }
+
+  const updatePagination = () => {
+    const itemsPerPage = 12
+    const totalItems = filteredHotels.length
+    const totalPages = Math.ceil(totalItems / itemsPerPage)
+    const startIndex = (currentPage - 1) * itemsPerPage
+    const endIndex = startIndex + itemsPerPage
+    const paginatedHotels = filteredHotels.slice(startIndex, endIndex)
+    
+    setHotels(paginatedHotels)
+    setTotalPages(totalPages)
+    setTotalHotels(totalItems)
+  }
+
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  // Apply filters when searchFilters change
+  useEffect(() => {
+    if (allHotels.length > 0) {
+      const filtered = applyFilters(allHotels)
+      setFilteredHotels(filtered)
+      setCurrentPage(1) // Reset to first page when filters change
+    }
+  }, [searchFilters, allHotels])
+
+  // Update pagination when filteredHotels or currentPage changes
+  useEffect(() => {
+    updatePagination()
+  }, [filteredHotels, currentPage])
+
+  // Handle click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (searchRef.current && !searchRef.current.contains(event.target)) {
+        setShowCitySuggestions(false)
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen relative overflow-hidden -mt-16 pt-32">
@@ -157,17 +311,30 @@ const Hotels = () => {
             {/* Amazing Advanced Search Bar */}
             <div className="bg-white/80 backdrop-blur-xl rounded-2xl p-6 border border-blue-200/40 shadow-xl animate-fade-in-up">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="relative group">
+                <div className="relative group" ref={searchRef}>
                   <label className="block text-sm font-bold text-blue-700 mb-2 tracking-wide">Destination</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 h-5 w-5 text-yellow-400 group-hover:scale-110 transition-transform duration-200" />
                     <input
                       type="text"
                       placeholder="Ville, hôtel..."
-                      value={searchFilters.location}
-                      onChange={(e) => handleFilterChange("location", e.target.value)}
+                      value={searchQuery}
+                      onChange={handleLocationChange}
                       className="w-full pl-10 pr-4 py-3 border border-blue-200 rounded-xl text-blue-900 placeholder-blue-300 focus:outline-none focus:ring-2 focus:ring-yellow-400 focus:border-yellow-400 transition-all duration-200 bg-white/90 shadow-sm hover:shadow-lg animate-glow"
                     />
+                    {showCitySuggestions && citySuggestions.length > 0 && (
+                      <ul className="absolute left-0 right-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto z-20">
+                        {citySuggestions.map((city) => (
+                          <li
+                            key={city}
+                            className="px-3 py-2 cursor-pointer hover:bg-gray-100 text-sm text-gray-800"
+                            onClick={() => handleSelectSuggestion(city)}
+                          >
+                            {city}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 </div>
 
@@ -245,35 +412,58 @@ const Hotels = () => {
 
                 {/* Price Range */}
                 <div className="mb-8">
-                  <h4 className="font-semibold text-gray-900 mb-4">Price Range (per night)</h4>
+                  <h4 className="font-semibold text-gray-900 mb-4">Gamme de Prix (par nuit)</h4>
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">$0</span>
-                      <span className="text-sm text-gray-600">$1000+</span>
+                      <span className="text-sm text-gray-600">0 MAD</span>
+                      <span className="text-sm text-gray-600">10000+ MAD</span>
                     </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1000"
-                      value={searchFilters.priceRange[1]}
-                      onChange={(e) => handlePriceRangeChange(0, Number.parseInt(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
-                    />
+                    
+                    {/* Min Price Slider */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Prix minimum</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="10000"
+                        value={searchFilters.priceRange[0]}
+                        onChange={(e) => handlePriceRangeChange(Number.parseInt(e.target.value), searchFilters.priceRange[1])}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
+                    {/* Max Price Slider */}
+                    <div>
+                      <label className="block text-xs text-gray-500 mb-1">Prix maximum</label>
+                      <input
+                        type="range"
+                        min="0"
+                        max="10000"
+                        value={searchFilters.priceRange[1]}
+                        onChange={(e) => handlePriceRangeChange(searchFilters.priceRange[0], Number.parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider"
+                      />
+                    </div>
+                    
                     <div className="flex items-center justify-between text-sm font-medium text-gray-900">
-                      <span>${searchFilters.priceRange[0]}</span>
-                      <span>${searchFilters.priceRange[1]}</span>
+                      <span>{formatCurrencyMAD(searchFilters.priceRange[0])}</span>
+                      <span>{formatCurrencyMAD(searchFilters.priceRange[1])}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Star Rating */}
                 <div className="mb-8">
-                  <h4 className="font-semibold text-gray-900 mb-4">Star Rating</h4>
+                  <h4 className="font-semibold text-gray-900 mb-4">Note Minimum</h4>
                   <div className="space-y-3">
                     {[5, 4, 3, 2, 1].map((rating) => (
                       <label key={rating} className="flex items-center cursor-pointer group">
                         <input
-                          type="checkbox"
+                          type="radio"
+                          name="rating"
+                          value={rating}
+                          checked={searchFilters.rating === rating}
+                          onChange={(e) => handleRatingChange(Number(e.target.value))}
                           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 transition-colors"
                         />
                         <div className="ml-3 flex items-center">
@@ -281,34 +471,48 @@ const Hotels = () => {
                             <Star key={i} className="h-4 w-4 text-yellow-400 fill-current" />
                           ))}
                           <span className="ml-2 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
-                            {rating} Star{rating > 1 ? "s" : ""}
+                            {rating} étoile{rating > 1 ? "s" : ""} et plus
                           </span>
                         </div>
                       </label>
                     ))}
+                    <label className="flex items-center cursor-pointer group">
+                      <input
+                        type="radio"
+                        name="rating"
+                        value={0}
+                        checked={searchFilters.rating === 0}
+                        onChange={(e) => handleRatingChange(0)}
+                        className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 transition-colors"
+                      />
+                      <span className="ml-3 text-sm text-gray-700 group-hover:text-gray-900 transition-colors">
+                        Toutes les notes
+                      </span>
+                    </label>
                   </div>
                 </div>
 
                 {/* Amenities */}
                 <div className="mb-8">
-                  <h4 className="font-semibold text-gray-900 mb-4">Amenities</h4>
+                  <h4 className="font-semibold text-gray-900 mb-4">Équipements</h4>
                   <div className="space-y-3">
                     {Object.entries(amenityIcons).map(([key, Icon]) => (
                       <label key={key} className="flex items-center cursor-pointer group">
                         <input
                           type="checkbox"
-                          checked={searchFilters.amenities.includes(key)}
+                          checked={searchFilters.amenities && searchFilters.amenities.includes(key)}
                           onChange={(e) => {
+                            const currentAmenities = searchFilters.amenities || []
                             const newAmenities = e.target.checked
-                              ? [...searchFilters.amenities, key]
-                              : searchFilters.amenities.filter((a) => a !== key)
+                              ? [...currentAmenities, key]
+                              : currentAmenities.filter((a) => a !== key)
                             handleFilterChange("amenities", newAmenities)
                           }}
                           className="rounded border-gray-300 text-primary-600 focus:ring-primary-500 transition-colors"
                         />
                         <Icon className="h-5 w-5 ml-3 text-gray-500 group-hover:text-primary-600 transition-colors" />
                         <span className="ml-2 text-sm text-gray-700 group-hover:text-gray-900 transition-colors capitalize">
-                          {key === "wifi" ? "WiFi" : key}
+                          {key === "wifi" ? "WiFi" : key === "parking" ? "Parking" : key === "restaurant" ? "Restaurant" : key === "pool" ? "Piscine" : key}
                         </span>
                       </label>
                     ))}
@@ -317,19 +521,22 @@ const Hotels = () => {
 
                 {/* Clear Filters */}
                 <button
-                  onClick={() =>
+                  onClick={() => {
                     updateSearchFilters({
                       location: "",
                       checkIn: "",
                       checkOut: "",
                       guests: 1,
-                      priceRange: [0, 1000],
+                      priceRange: [0, 10000],
                       amenities: [],
+                      rating: 0
                     })
-                  }
-                  className="w-full px-4 py-2 text-primary-600 hover:text-primary-700 font-medium transition-colors"
+                    setSearchQuery("")
+                    setCurrentPage(1)
+                  }}
+                  className="w-full px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 hover:text-gray-900 font-medium transition-colors rounded-lg"
                 >
-                  Clear All Filters
+                  Effacer tous les filtres
                 </button>
               </div>
             </div>
@@ -340,9 +547,14 @@ const Hotels = () => {
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">
-                    {searching ? "Recherche en cours..." : loading ? "Chargement..." : `${hotels.length} propriétés trouvées`}
+                    {searching ? "Recherche en cours..." : loading ? "Chargement..." : `${totalHotels} propriétés trouvées`}
                   </h2>
-                  {searchFilters.location && <p className="text-gray-600 mt-1">in {searchFilters.location}</p>}
+                  {searchFilters.location && <p className="text-gray-600 mt-1">à {searchFilters.location}</p>}
+                  {totalPages > 1 && (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Page {currentPage} sur {totalPages}
+                    </p>
+                  )}
                 </div>
 
                 <div className="mt-4 sm:mt-0">
@@ -445,6 +657,61 @@ const Hotels = () => {
                       </div>
                     </Link>
                   ))}
+                </div>
+              )}
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="mt-12 flex justify-center">
+                  <nav className="flex items-center space-x-2">
+                    {/* Previous Button */}
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Précédent
+                    </button>
+
+                    {/* Page Numbers */}
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                      // Show first page, last page, current page, and pages around current page
+                      if (
+                        page === 1 ||
+                        page === totalPages ||
+                        (page >= currentPage - 1 && page <= currentPage + 1)
+                      ) {
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => handlePageChange(page)}
+                            className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                              page === currentPage
+                                ? 'bg-blue-600 text-white'
+                                : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        )
+                      } else if (
+                        page === currentPage - 2 ||
+                        page === currentPage + 2
+                      ) {
+                        return <span key={page} className="px-2 text-gray-500">...</span>
+                      }
+                      return null
+                    })}
+
+                    {/* Next Button */}
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    >
+                      Suivant
+                    </button>
+                  </nav>
                 </div>
               )}
             </div>
