@@ -280,17 +280,7 @@ const Navbar = () => {
                 {/* Notifications et Favorites - masqués pour les admins */}
                 {!isAdmin && (
                   <>
-                    {/* Notifications */}
-                    <button
-                      className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 relative ${
-                        scrolled
-                          ? "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
-                          : "text-white/90 hover:text-white hover:bg-white/10"
-                      }`}
-                    >
-                      <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full"></span>
-                    </button>
+                
 
                     {/* Favorites */}
                     <Link

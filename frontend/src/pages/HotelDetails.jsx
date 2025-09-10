@@ -563,12 +563,6 @@ const HotelDetails = () => {
           <div className="lg:col-span-1">
             <div className="sticky top-8">
               <div className="bg-white rounded-2xl shadow-hard p-8 border border-gray-100">
-                <div className="text-center mb-6">
-                  <div className="text-3xl font-bold text-primary-600 mb-1">
-                    {formatCurrencyMAD(selectedRoom?.pricePerNight || hotel.pricePerNight)}
-                  </div>
-                  <div className="text-gray-600">par nuit</div>
-                </div>
 
                 <div className="space-y-4 mb-6">
                 <div>
@@ -620,30 +614,6 @@ const HotelDetails = () => {
                 </div>
                     </div>
 
-                {/* Price Breakdown */}
-                {bookingData.checkIn && bookingData.checkOut && (
-                  <div className="border-t border-gray-200 pt-6 mb-6">
-                    <h3 className="font-semibold text-gray-900 mb-4">Détails du prix</h3>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">
-                          {formatCurrencyMAD(pricing.roomPrice)} × {pricing.nights} nuit{pricing.nights > 1 ? "s" : ""}
-                      </span>
-                        <span className="text-gray-900">{formatCurrencyMAD(pricing.subtotal)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Taxes & frais</span>
-                        <span className="text-gray-900">{formatCurrencyMAD(pricing.taxes)}</span>
-                      </div>
-                      <div className="border-t border-gray-200 pt-2 mt-2">
-                        <div className="flex justify-between font-semibold text-lg">
-                          <span className="text-gray-900">Total</span>
-                          <span className="text-primary-600">{formatCurrencyMAD(pricing.total)}</span>
-                        </div>
-                    </div>
-                    </div>
-                  </div>
-                )}
 
                 <button
                   onClick={handleBooking}
