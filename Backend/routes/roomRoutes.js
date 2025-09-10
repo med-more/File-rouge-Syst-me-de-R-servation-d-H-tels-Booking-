@@ -23,4 +23,4 @@ router.post('/rooms', createRoomValidation, handleValidation, roomController.cre
 router.put('/rooms/:id', createRoomValidation, handleValidation, roomController.updateRoom);
 router.delete('/rooms/:id', roomController.deleteRoom);
 
-module.exports = router; 
+module.exports = router;

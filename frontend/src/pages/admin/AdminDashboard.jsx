@@ -9,13 +9,16 @@ import {
   TrendingUp,
   Calendar,
   MapPin,
-  DollarSign,
+  Banknote,
   Clock,
   ArrowUpRight,
   ArrowDownRight,
+  Mail,
 } from "lucide-react"
 import axios from "axios"
 import { toast } from "react-toastify"
+import { formatCurrencyMAD } from "../../utils/helpers"
+import AdminLayout from "../../components/layout/AdminLayout"
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -34,59 +37,76 @@ const AdminDashboard = () => {
   const [recentUsers, setRecentUsers] = useState([])
   const [loading, setLoading] = useState(true)
 
-  // Données statiques pour les réservations récentes
-  const recentBookingsData = [
-    {
-      id: "1",
-      hotelName: "Hôtel Luxe Paris",
-      userName: "Jean Dupont",
-      amount: 450,
-      date: "2024-03-15",
-      status: "confirmed"
-    },
-    {
-      id: "2",
-      hotelName: "Grand Hôtel Lyon",
-      userName: "Marie Martin",
-      amount: 320,
-      date: "2024-03-14",
-      status: "pending"
-    },
-    {
-      id: "3",
-      hotelName: "Hôtel Riviera Nice",
-      userName: "Pierre Durand",
-      amount: 580,
-      date: "2024-03-13",
-      status: "cancelled"
-    }
-  ]
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true)
-        // Simuler un délai de chargement
-        await new Promise(resolve => setTimeout(resolve, 1000))
         
-        // Données statiques pour le tableau de bord
+        // Récupérer les données du backend
+        const token = localStorage.getItem('token')
+        const response = await axios.get('http://localhost:5000/api/admin/dashboard', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        
+        const data = response.data
+        console.log('Dashboard data received:', data)
+        
+        // Utiliser la structure imbriquée du backend
+        const overview = data.overview || {}
+        const users = data.users || {}
+        const hotels = data.hotels || {}
+        const bookings = data.bookings || {}
+        const recent = data.recent || {}
+        
+        // Calculer les pourcentages de croissance
+        const userGrowth = users.newThisMonth > 0 && users.total > 0 ? 
+          Math.round((users.newThisMonth / users.total) * 100) : 0
+        const hotelGrowth = hotels.pending > 0 && hotels.total > 0 ? 
+          Math.round((hotels.pending / hotels.total) * 100) : 0
+        const bookingGrowth = bookings.confirmed > 0 && bookings.total > 0 ? 
+          Math.round((bookings.confirmed / bookings.total) * 100) : 0
+        const revenueGrowth = overview.monthlyRevenue > 0 && overview.totalRevenue > 0 ? 
+          Math.round((overview.monthlyRevenue / overview.totalRevenue) * 100) : 0
+        
         const dashboardData = {
-          totalUsers: 1250,
-          totalHotels: 85,
-          totalBookings: 3200,
-          totalRevenue: 450000,
+          totalUsers: overview.totalUsers || 0,
+          totalHotels: overview.totalHotels || 0,
+          totalBookings: overview.totalBookings || 0,
+          totalRevenue: overview.totalRevenue || 0,
           monthlyGrowth: {
-            users: 12,
-            hotels: 5,
-            bookings: 8,
-            revenue: 15
+            users: userGrowth,
+            hotels: hotelGrowth,
+            bookings: bookingGrowth,
+            revenue: revenueGrowth
           }
         }
         
+        console.log('Processed dashboard data:', dashboardData)
+        console.log('Recent bookings:', recent.bookings)
+        console.log('Recent users:', recent.users)
         setStats(dashboardData)
+        setRecentBookings(recent.bookings || [])
+        setRecentUsers(recent.users || [])
+        
       } catch (error) {
         console.error("Erreur lors du chargement des données:", error)
         toast.error("Erreur lors du chargement des données du tableau de bord")
+        
+        // Fallback aux données statiques en cas d'erreur
+        const fallbackData = {
+          totalUsers: 0,
+          totalHotels: 0,
+          totalBookings: 0,
+          totalRevenue: 0,
+          monthlyGrowth: {
+            users: 0,
+            hotels: 0,
+            bookings: 0,
+            revenue: 0
+          }
+        }
+        setStats(fallbackData)
       } finally {
         setLoading(false)
       }
@@ -123,9 +143,9 @@ const AdminDashboard = () => {
     },
     {
       title: "Total Revenue",
-      value: `$${formatNumber(stats?.totalRevenue || 0)}`,
+      value: formatCurrencyMAD(stats?.totalRevenue || 0),
       change: stats?.monthlyGrowth?.revenue || 0,
-      icon: DollarSign,
+      icon: Banknote,
       color: "purple"
     }
   ]
@@ -183,7 +203,8 @@ const AdminDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen pt-32 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
+    <AdminLayout>
+      <div className="min-h-screen pt-8 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
       {/* Background Spots - Style premium */}
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -268,7 +289,7 @@ const AdminDashboard = () => {
               <div className="flex items-center justify-between">
                 <h3 className="text-xl font-bold text-gray-900">Recent Bookings</h3>
                 <Link
-                  to="/admin/bookings"
+                  to="/admin/payments"
                     className="text-blue-600 hover:text-blue-700 font-medium text-sm transition-colors"
                 >
                   View All
@@ -276,23 +297,23 @@ const AdminDashboard = () => {
               </div>
             </div>
             <div className="p-6">
-              {recentBookingsData.length === 0 ? (
+              {recentBookings.length === 0 ? (
                 <div className="text-center py-8">
                   <Calendar className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-600">No recent bookings</p>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {recentBookingsData.slice(0, 5).map((booking) => (
+                  {recentBookings.slice(0, 5).map((booking) => (
                     <div
-                      key={booking.id}
+                      key={booking._id}
                         className="flex items-center justify-between p-4 bg-white/70 rounded-xl hover:bg-blue-50 transition-colors shadow"
                     >
                       <div className="flex-1">
-                        <h4 className="font-medium text-gray-900">{booking.hotelName}</h4>
+                        <h4 className="font-medium text-gray-900">{booking.hotelId?.name || 'Hotel'}</h4>
                         <div className="flex items-center text-sm text-gray-600 mt-1">
                           <MapPin className="h-4 w-4 mr-1" />
-                          <span>{booking.location}</span>
+                          <span>{booking.hotelId?.location || 'Location'}</span>
                         </div>
                         <div className="flex items-center text-sm text-gray-500 mt-1">
                           <Clock className="h-4 w-4 mr-1" />
@@ -300,7 +321,7 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                        <div className="font-semibold text-gray-900">${booking.totalPrice?.toLocaleString()}</div>
+                        <div className="font-semibold text-gray-900">{formatCurrencyMAD(booking.totalPrice || 0)}</div>
                         <div
                           className={`text-xs px-2 py-1 rounded-full ${
                             booking.status === "confirmed"
@@ -310,7 +331,7 @@ const AdminDashboard = () => {
                                 : "bg-red-100 text-red-600"
                           }`}
                         >
-                            {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+                            {booking.status?.charAt(0).toUpperCase() + booking.status?.slice(1)}
                         </div>
                       </div>
                     </div>
@@ -343,11 +364,11 @@ const AdminDashboard = () => {
                 <div className="space-y-4">
                   {recentUsers.slice(0, 5).map((user) => (
                     <div
-                        key={user.id}
+                        key={user._id}
                         className="flex items-center justify-between p-4 bg-white/70 rounded-xl hover:bg-blue-50 transition-colors shadow"
                       >
                         <div className="flex-1">
-                          <h4 className="font-medium text-gray-900">{user.name}</h4>
+                          <h4 className="font-medium text-gray-900">{user.name || user.firstName + ' ' + user.lastName}</h4>
                           <div className="flex items-center text-sm text-gray-600 mt-1">
                             <Mail className="h-4 w-4 mr-1" />
                             <span>{user.email}</span>
@@ -358,15 +379,15 @@ const AdminDashboard = () => {
                         </div>
                       </div>
                       <div className="text-right">
-                          <div className="font-semibold text-gray-900">{user.role}</div>
+                          <div className="font-semibold text-gray-900">{user.role || 'User'}</div>
                         <div
                           className={`text-xs px-2 py-1 rounded-full ${
-                              user.status === "active"
+                              user.isActive !== false
                                 ? "bg-green-100 text-green-600"
                                 : "bg-red-100 text-red-600"
                           }`}
                         >
-                            {user.status.charAt(0).toUpperCase() + user.status.slice(1)}
+                            {user.isActive !== false ? 'Active' : 'Inactive'}
                         </div>
                       </div>
                     </div>
@@ -378,7 +399,8 @@ const AdminDashboard = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </AdminLayout>
   )
 }
 

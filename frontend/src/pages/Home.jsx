@@ -756,18 +756,18 @@ const Home = () => {
                     <div className="p-3">
                       <div className="mb-2">
                         <h3 className="text-sm font-semibold text-gray-900 group-hover:text-red-600 transition-colors leading-tight mb-1 line-clamp-1">
-                          {destination.name}
-                        </h3>
+                        {destination.name}
+                      </h3>
                         <p className="text-gray-600 text-xs leading-relaxed group-hover:text-gray-700 transition-colors line-clamp-2">
-                          {destination.description}
-                        </p>
+                        {destination.description}
+                      </p>
                       </div>
 
                       <div className="flex items-center justify-between">
                         <div className="text-xs text-gray-400">
                           <div className="bg-red-50 text-red-600 px-2 py-1 rounded-full font-medium">
                             Découvrir
-                          </div>
+                        </div>
                         </div>
                       </div>
                     </div>

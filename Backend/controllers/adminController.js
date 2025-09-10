@@ -3,12 +3,38 @@ const Hotel = require('../models/Hotel');
 const Room = require('../models/Room');
 const Booking = require('../models/Booking');
 
+exports.testData = async (req, res) => {
+  try {
+    const userCount = await User.countDocuments();
+    const hotelCount = await Hotel.countDocuments();
+    const bookingCount = await Booking.countDocuments();
+    
+    const sampleUsers = await User.find().limit(3);
+    const sampleHotels = await Hotel.find().limit(3);
+    const sampleBookings = await Booking.find().limit(3);
+    
+    res.json({
+      counts: { userCount, hotelCount, bookingCount },
+      sampleUsers,
+      sampleHotels,
+      sampleBookings
+    });
+  } catch (error) {
+    console.error('Test data error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 exports.getDashboardStats = async (req, res) => {
   try {
+    console.log('Starting dashboard stats calculation...');
+    
     const totalUsers = await User.countDocuments();
     const totalHotels = await Hotel.countDocuments();
     const totalRooms = await Room.countDocuments();
     const totalBookings = await Booking.countDocuments();
+    
+    console.log('Basic counts:', { totalUsers, totalHotels, totalRooms, totalBookings });
 
     const newUsersThisMonth = await User.countDocuments({
       createdAt: { $gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1) }
@@ -141,6 +167,13 @@ exports.getDashboardStats = async (req, res) => {
       }
     };
 
+    console.log('Dashboard stats calculated:', {
+      totalUsers,
+      totalHotels,
+      totalBookings,
+      totalRevenue: totalRevenue[0]?.total || 0
+    });
+    
     res.json(dashboardStats);
   } catch (error) {
     console.error('Dashboard stats error:', error);
@@ -173,14 +206,11 @@ exports.getHotels = async (req, res) => {
       filter.status = status;
     }
 
-    // Construire le tri
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Calculer la pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Récupérer les hôtels avec pagination
     const hotels = await Hotel.find(filter)
       .sort(sort)
       .skip(skip)
@@ -188,13 +218,11 @@ exports.getHotels = async (req, res) => {
       .populate('rooms', 'type pricePerNight maxGuests quantity')
       .lean();
 
-    // Compter le total pour la pagination
+
     const total = await Hotel.countDocuments(filter);
     
-    // Calculer les statistiques pour chaque hôtel
     const hotelsWithStats = await Promise.all(
       hotels.map(async (hotel) => {
-        // Compter les réservations pour cet hôtel
         const bookingStats = await Booking.aggregate([
           { $match: { hotelId: hotel._id } },
           {
@@ -206,15 +234,12 @@ exports.getHotels = async (req, res) => {
           }
         ]);
 
-        // Calculer les revenus totaux
         const totalRevenue = bookingStats.reduce((sum, stat) => sum + stat.revenue, 0);
         
-        // Compter les réservations par statut
         const confirmedBookings = bookingStats.find(stat => stat._id === 'confirmed')?.count || 0;
         const pendingBookings = bookingStats.find(stat => stat._id === 'pending')?.count || 0;
         const cancelledBookings = bookingStats.find(stat => stat._id === 'cancelled')?.count || 0;
 
-        // Calculer le taux d'occupation (si des chambres existent)
         const totalRooms = hotel.rooms?.reduce((sum, room) => sum + room.quantity, 0) || 0;
         const occupancyRate = totalRooms > 0 ? (confirmedBookings / totalRooms) * 100 : 0;
 
@@ -233,7 +258,6 @@ exports.getHotels = async (req, res) => {
       })
     );
 
-    // Statistiques globales pour les filtres
     const globalStats = await Hotel.aggregate([
       { $match: filter },
       {
@@ -288,10 +312,9 @@ exports.createHotel = async (req, res) => {
   try {
     const hotelData = req.body;
     
-    // Créer l'hôtel avec le statut par défaut
     const hotel = new Hotel({
       ...hotelData,
-      status: hotelData.status || 'pending' // Par défaut en attente d'approbation
+      status: hotelData.status || 'pending' 
     });
     
     await hotel.save();
@@ -318,7 +341,6 @@ exports.getHotelById = async (req, res) => {
       return res.status(404).json({ message: 'Hotel not found' });
     }
     
-    // Calculer les statistiques pour cet hôtel
     const bookingStats = await Booking.aggregate([
       { $match: { hotelId: hotel._id } },
       {
@@ -388,7 +410,6 @@ exports.deleteHotel = async (req, res) => {
     const { id } = req.params;
     const { force = false } = req.query;
     
-    // Vérifier s'il y a des réservations actives
     const activeBookings = await Booking.countDocuments({
       hotelId: id,
       status: { $in: ['confirmed', 'pending'] }
@@ -408,10 +429,8 @@ exports.deleteHotel = async (req, res) => {
       return res.status(404).json({ message: 'Hotel not found' });
     }
     
-    // Supprimer aussi toutes les chambres associées
     await Room.deleteMany({ hotelId: id });
     
-    // Si suppression forcée, annuler toutes les réservations actives
     if (force && activeBookings > 0) {
       await Booking.updateMany(
         { hotelId: id, status: { $in: ['confirmed', 'pending'] } },
@@ -474,7 +493,6 @@ exports.getBookings = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Construire le filtre
     const filter = {};
     
     if (search) {
@@ -508,14 +526,11 @@ exports.getBookings = async (req, res) => {
       }
     }
 
-    // Construire le tri
     const sort = {};
     sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
 
-    // Calculer la pagination
     const skip = (parseInt(page) - 1) * parseInt(limit);
     
-    // Récupérer les réservations avec pagination
     const bookings = await Booking.find(filter)
       .populate('userId', 'name email')
       .populate('hotelId', 'name location')
@@ -525,10 +540,8 @@ exports.getBookings = async (req, res) => {
       .limit(parseInt(limit))
       .lean();
 
-    // Compter le total pour la pagination
     const total = await Booking.countDocuments(filter);
     
-    // Calculer les statistiques pour chaque réservation
     const bookingsWithDetails = bookings.map(booking => {
       const nights = Math.ceil((new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24));
       const totalPrice = booking.totalPrice || (booking.roomId?.pricePerNight * nights);
@@ -542,7 +555,6 @@ exports.getBookings = async (req, res) => {
       };
     });
 
-    // Statistiques globales pour les filtres
     const globalStats = await Booking.aggregate([
       { $match: filter },
       {
@@ -565,7 +577,6 @@ exports.getBookings = async (req, res) => {
       }
     ]);
 
-    // Statistiques par statut
     const statusStats = await Booking.aggregate([
       { $match: filter },
       {
@@ -577,7 +588,6 @@ exports.getBookings = async (req, res) => {
       }
     ]);
 
-    // Top hôtels par réservations
     const topHotels = await Booking.aggregate([
       { $match: filter },
       {
@@ -659,7 +669,6 @@ exports.getBookingById = async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Calculer les détails supplémentaires
     const nights = Math.ceil((new Date(booking.checkOut) - new Date(booking.checkIn)) / (1000 * 60 * 60 * 24));
     const totalPrice = booking.totalPrice || (booking.roomId?.pricePerNight * nights);
     
@@ -684,19 +693,16 @@ exports.updateBooking = async (req, res) => {
     const { id } = req.params;
     const updateData = req.body;
     
-    // Vérifier si la réservation existe
     const existingBooking = await Booking.findById(id);
     if (!existingBooking) {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Si on change les dates, recalculer le prix total
     if (updateData.checkIn || updateData.checkOut) {
       const checkIn = updateData.checkIn || existingBooking.checkIn;
       const checkOut = updateData.checkOut || existingBooking.checkOut;
       const nights = Math.ceil((new Date(checkOut) - new Date(checkIn)) / (1000 * 60 * 60 * 24));
       
-      // Récupérer le prix de la chambre
       const room = await Room.findById(existingBooking.roomId);
       if (room) {
         updateData.totalPrice = room.pricePerNight * nights;
@@ -731,7 +737,6 @@ exports.deleteBooking = async (req, res) => {
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Vérifier si la réservation peut être supprimée
     if (booking.status === 'confirmed' && new Date(booking.checkIn) <= new Date()) {
       return res.status(400).json({
         message: 'Cannot delete confirmed booking that has already started'
@@ -752,20 +757,33 @@ exports.deleteBooking = async (req, res) => {
 exports.updateBookingStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, paymentStatus } = req.body;
     
-    if (!['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
+    console.log('updateBookingStatus called:', { id, status, paymentStatus });
+    console.log('req.user:', req.user);
+    
+    if (status && !['pending', 'confirmed', 'cancelled', 'completed'].includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
+    }
+    
+    if (paymentStatus && !['pending', 'paid', 'refunded', 'failed'].includes(paymentStatus)) {
+      return res.status(400).json({ message: 'Invalid payment status' });
     }
     
     const booking = await Booking.findById(id);
     if (!booking) {
+      console.log('Booking not found:', id);
       return res.status(404).json({ message: 'Booking not found' });
     }
     
-    // Logique métier pour les changements de statut
+    console.log('Found booking:', { 
+      _id: booking._id, 
+      status: booking.status, 
+      paymentStatus: booking.paymentStatus,
+      userId: booking.userId 
+    });
+    
     if (status === 'cancelled' && booking.status === 'confirmed') {
-      // Vérifier si on peut annuler une réservation confirmée
       if (new Date(booking.checkIn) <= new Date()) {
         return res.status(400).json({
           message: 'Cannot cancel confirmed booking that has already started'
@@ -773,15 +791,47 @@ exports.updateBookingStatus = async (req, res) => {
       }
     }
     
-    booking.status = status;
+    const previousStatus = booking.status;
+    const previousPaymentStatus = booking.paymentStatus;
     
-    // Si on confirme une réservation, mettre à jour la disponibilité
-    if (status === 'confirmed' && booking.status !== 'confirmed') {
-      // Logique pour mettre à jour la disponibilité des chambres
-      // (à implémenter selon votre logique métier)
+    if (status) {
+      booking.status = status;
     }
     
+    if (paymentStatus) {
+      booking.paymentStatus = paymentStatus;
+    }
+
+    if (status === 'confirmed') {
+      booking.confirmedAt = new Date();
+      if (!paymentStatus) booking.paymentStatus = 'paid';
+    } else if (status === 'cancelled') {
+      booking.cancelledAt = new Date();
+      if (!paymentStatus) booking.paymentStatus = 'refunded';
+      console.log('Setting booking as cancelled with refunded payment status');
+    } else if (status === 'completed') {
+      booking.completedAt = new Date();
+      if (!paymentStatus) booking.paymentStatus = 'paid';
+    } else if (status === 'pending') {
+      if (!paymentStatus) booking.paymentStatus = 'pending';
+    }
+
+    
+    console.log('Saving booking with new status:', {
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      cancelledAt: booking.cancelledAt
+    });
+    
     await booking.save();
+    
+    console.log('Booking status updated successfully:', {
+      bookingId: id,
+      previousStatus,
+      newStatus: booking.status,
+      previousPaymentStatus,
+      newPaymentStatus: booking.paymentStatus
+    });
     
     const updatedBooking = await Booking.findById(id)
       .populate('userId', 'name email')
@@ -798,14 +848,12 @@ exports.updateBookingStatus = async (req, res) => {
   }
 };
 
-// Gestion des utilisateurs
 exports.getUsers = async (req, res) => {
   try {
     const { page = 1, limit = 50, search, role, status } = req.query;
     
     let query = {};
     
-    // Filtre par recherche
     if (search) {
       query.$or = [
         { name: { $regex: search, $options: 'i' } },
@@ -813,12 +861,10 @@ exports.getUsers = async (req, res) => {
       ];
     }
     
-    // Filtre par rôle
     if (role && role !== 'all') {
       query.role = role;
     }
     
-    // Filtre par statut
     if (status && status !== 'all') {
       if (status === 'active') {
         query.status = 'active';
@@ -930,7 +976,6 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
     
-    // Vérifier s'il y a des réservations actives
     const activeBookings = await Booking.countDocuments({
       userId: user._id,
       status: { $in: ['confirmed', 'pending'] }
@@ -981,7 +1026,6 @@ exports.bulkUserAction = async (req, res) => {
     }
     
     if (deleteUsers) {
-      // Vérifier les réservations actives avant suppression
       const usersWithBookings = await Booking.aggregate([
         { $match: { userId: { $in: userIds }, status: { $in: ['confirmed', 'pending'] } } },
         { $group: { _id: '$userId', count: { $sum: 1 } } }
@@ -1013,7 +1057,7 @@ exports.exportUsers = async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
     
-    // Créer le CSV
+    // Créer le CSV    that stay here or not 
     const csvHeader = 'Name,Email,Role,Status,Email Verified,Created At\n';
     const csvRows = users.map(user => {
       return `${user.name || ''},${user.email},${user.role},${user.status || 'active'},${user.isEmailVerified ? 'Yes' : 'No'},${user.createdAt}`;

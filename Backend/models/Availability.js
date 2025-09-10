@@ -70,6 +70,9 @@ const availabilitySchema = new mongoose.Schema({
   timestamps: true
 });
 
+
+
+//interested part
 availabilitySchema.index({ hotelId: 1, roomId: 1, date: 1 }, { unique: true });
 
 availabilitySchema.index({ date: 1, isAvailable: 1 });

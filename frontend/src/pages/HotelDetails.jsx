@@ -224,8 +224,28 @@ const HotelDetails = () => {
       ...calculateTotal(),
     }
 
-    setCurrentBooking(booking)
-    navigate("/payment")
+    // Résoudre l'ID réel de Room (document) si _id est absent dans les données de l'hôtel
+    const goToPayment = async () => {
+      try {
+        if (!booking.roomId) {
+          const { data } = await axios.get(`http://localhost:5000/api/rooms`, { params: { hotelId: hotel._id, limit: 100 } })
+          const apiRooms = Array.isArray(data?.rooms) ? data.rooms : []
+          // Trouver par type; fallback sur pricePerNight et maxGuests si nécessaire
+          const match = apiRooms.find(r => r.type === selectedRoom.type) ||
+                        apiRooms.find(r => Number(r.pricePerNight) === Number(selectedRoom.pricePerNight) && Number(r.maxGuests) === Number(selectedRoom.maxGuests))
+          if (match?._id) {
+            booking.roomId = match._id
+          }
+        }
+      } catch (e) {
+        // On continue même si on n'a pas pu résoudre, le backend renverra l'erreur explicite
+      } finally {
+        setCurrentBooking(booking)
+        navigate("/payment")
+      }
+    }
+
+    goToPayment()
   }
 
   const toggleFavorite = async () => {

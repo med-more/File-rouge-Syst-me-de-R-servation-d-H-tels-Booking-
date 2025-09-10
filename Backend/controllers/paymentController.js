@@ -1,0 +1,1 @@
+/////Add the strip and pypal verification 

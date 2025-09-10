@@ -6,8 +6,19 @@ import { toast } from "react-toastify"
 
 const BookingContext = createContext()
 
+// ✅ Charger les réservations depuis localStorage au démarrage
+const loadBookingsFromStorage = () => {
+  try {
+    const savedBookings = localStorage.getItem('userBookings')
+    return savedBookings ? JSON.parse(savedBookings) : []
+  } catch (e) {
+    console.warn('Could not load bookings from localStorage:', e)
+    return []
+  }
+}
+
 const initialState = {
-  bookings: [],
+  bookings: loadBookingsFromStorage(), // ✅ Charger depuis localStorage
   currentBooking: null,
   loading: false,
   searchFilters: {
@@ -50,12 +61,29 @@ const bookingReducer = (state, action) => {
 }
 
 export const BookingProvider = ({ children }) => {
-  const [state, dispatch] = useReducer(bookingReducer, initialState)
+  const persisted = (() => {
+    try {
+      const saved = localStorage.getItem('currentBooking')
+      return saved ? JSON.parse(saved) : null
+    } catch {
+      return null
+    }
+  })()
+
+  const [state, dispatch] = useReducer(bookingReducer, {
+    ...initialState,
+    currentBooking: persisted
+  })
+
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
 
   const fetchBookings = async () => {
     dispatch({ type: "SET_LOADING", payload: true })
     try {
-      const response = await axios.get("/api/bookings")
+      const response = await axios.get("/api/bookings", { headers: getAuthHeaders() })
       dispatch({ type: "SET_BOOKINGS", payload: response.data.bookings })
     } catch (error) {
       toast.error("Failed to fetch bookings")
@@ -64,13 +92,77 @@ export const BookingProvider = ({ children }) => {
     }
   }
 
+  const fetchUserBookings = async (userId) => {
+    dispatch({ type: "SET_LOADING", payload: true })
+    try {
+      console.log('Fetching bookings for user:', userId)
+      console.log('Auth headers:', getAuthHeaders())
+      
+      const response = await axios.get(`/api/bookings/user/${userId}`, { headers: getAuthHeaders() })
+      console.log('Bookings response:', response.data)
+      console.log('Response status:', response.status)
+      
+      const bookings = response?.data?.bookings || response?.data?.results?.bookings || response?.data?.data?.bookings || []
+      console.log('Parsed bookings:', bookings)
+      console.log('Number of bookings found:', bookings.length)
+      
+      dispatch({ type: "SET_BOOKINGS", payload: bookings })
+      
+      // ✅ Sauvegarder les réservations localement pour persistance
+      try {
+        localStorage.setItem('userBookings', JSON.stringify(bookings))
+      } catch (e) {
+        console.warn('Could not save bookings to localStorage:', e)
+      }
+      
+      return { success: true }
+    } catch (error) {
+      console.error('Error fetching bookings:', error)
+      console.error('Error response:', error.response)
+      console.error('Error status:', error.response?.status)
+      console.error('Error data:', error.response?.data)
+      
+      toast.error(error.response?.data?.message || "Failed to fetch bookings")
+      // ✅ Ne pas vider les réservations en cas d'erreur - garder les existantes
+      // dispatch({ type: "SET_BOOKINGS", payload: [] })
+      return { success: false }
+    } finally {
+      dispatch({ type: "SET_LOADING", payload: false })
+    }
+  }
+
+  const checkAvailability = async ({ hotelId, roomId, checkIn, checkOut, guests = 1, includeRoomDetails = false }) => {
+    try {
+      const response = await axios.post('/api/bookings/check-availability', {
+        hotelId, roomId, checkIn, checkOut, guests, includeRoomDetails
+      }, { headers: getAuthHeaders() })
+      return { success: true, data: response.data }
+    } catch (error) {
+      const message = error.response?.data?.message || 'Availability check failed'
+      return { success: false, message }
+    }
+  }
+
   const createBooking = async (bookingData) => {
     try {
-      const response = await axios.post("/api/bookings", bookingData)
+      console.log('Creating booking with data:', bookingData)
+      const response = await axios.post("http://localhost:5000/api/bookings", bookingData, { headers: getAuthHeaders() })
+      console.log('Booking created successfully:', response.data)
       dispatch({ type: "ADD_BOOKING", payload: response.data.booking })
       toast.success("Booking created successfully!")
       return { success: true, booking: response.data.booking }
     } catch (error) {
+      console.error('Booking creation error:', error.response?.data)
+      console.error('Full error response:', error.response)
+      console.error('Validation errors:', error.response?.data?.errors)
+      
+      // Afficher les détails des erreurs de validation
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        error.response.data.errors.forEach((err, index) => {
+          console.error(`Validation error ${index + 1}:`, err)
+        })
+      }
+      
       toast.error(error.response?.data?.message || "Booking failed")
       return { success: false, error: error.response?.data?.message }
     }
@@ -78,11 +170,38 @@ export const BookingProvider = ({ children }) => {
 
   const cancelBooking = async (bookingId) => {
     try {
-      const response = await axios.put(`/api/bookings/${bookingId}/cancel`)
+      console.log('Cancelling booking via context:', bookingId);
+      
+      // ✅ Utiliser la route utilisateur au lieu de la route admin
+      const response = await axios.patch(`/api/bookings/${bookingId}/cancel`, 
+        { 
+          reason: 'Cancelled by user' 
+        }, 
+        { headers: getAuthHeaders() }
+      );
+      
+      console.log('Booking cancelled successfully via context:', response.data);
+      
+      // ✅ Mettre à jour la réservation dans le contexte
       dispatch({ type: "UPDATE_BOOKING", payload: response.data.booking })
+      
+      // ✅ Sauvegarder les réservations mises à jour
+      try {
+        const currentBookings = state.bookings.map(b => 
+          b._id === bookingId 
+            ? { ...b, status: 'cancelled', paymentStatus: 'refunded' }
+            : b
+        );
+        localStorage.setItem('userBookings', JSON.stringify(currentBookings));
+      } catch (e) {
+        console.warn('Could not save updated bookings to localStorage:', e);
+      }
+      
       toast.success("Booking cancelled successfully!")
       return { success: true }
     } catch (error) {
+      console.error('Cancel booking error:', error);
+      console.error('Error response:', error.response?.data);
       toast.error(error.response?.data?.message || "Cancellation failed")
       return { success: false }
     }
@@ -92,13 +211,34 @@ export const BookingProvider = ({ children }) => {
     dispatch({ type: "UPDATE_SEARCH_FILTERS", payload: filters })
   }
 
+  const clearBookings = () => {
+    dispatch({ type: "SET_BOOKINGS", payload: [] })
+    try {
+      localStorage.removeItem('userBookings')
+    } catch (e) {
+      console.warn('Could not clear bookings from localStorage:', e)
+    }
+  }
+
   const value = {
     ...state,
     fetchBookings,
+    fetchUserBookings,
+    checkAvailability,
     createBooking,
     cancelBooking,
     updateSearchFilters,
-    setCurrentBooking: (booking) => dispatch({ type: "SET_CURRENT_BOOKING", payload: booking }),
+    clearBookings, // ✅ Fonction pour nettoyer les réservations
+    setCurrentBooking: (booking) => {
+      try {
+        if (booking) {
+          localStorage.setItem('currentBooking', JSON.stringify(booking))
+        } else {
+          localStorage.removeItem('currentBooking')
+        }
+      } catch {}
+      dispatch({ type: "SET_CURRENT_BOOKING", payload: booking })
+    },
   }
 
   return <BookingContext.Provider value={value}>{children}</BookingContext.Provider>

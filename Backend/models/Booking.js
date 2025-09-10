@@ -372,26 +372,39 @@ bookingSchema.statics.checkAvailability = async function(hotelId, roomId, checkI
 };
 
 bookingSchema.statics.createBooking = async function(bookingData) {
-  const { hotelId, roomId, checkIn, checkOut, guests } = bookingData;
-  
-  const availabilityCheck = await this.checkAvailability(hotelId, roomId, checkIn, checkOut, guests.adults);
-  if (!availabilityCheck.available) {
-    throw new Error(availabilityCheck.reason);
+  try {
+    console.log('Creating booking with data:', bookingData)
+    
+    const { hotelId, roomId, checkIn, checkOut, guests } = bookingData;
+    
+    const availabilityCheck = await this.checkAvailability(hotelId, roomId, checkIn, checkOut, guests.adults);
+    if (!availabilityCheck.available) {
+      throw new Error(availabilityCheck.reason);
+    }
+    
+    const bookingNumber = await this.generateBookingNumber();
+    console.log('Generated booking number:', bookingNumber)
+    
+    const booking = new this({
+      ...bookingData,
+      bookingNumber
+    });
+    
+    console.log('Booking instance created, attempting to save...')
+    await booking.save();
+    console.log('Booking saved successfully')
+    
+    const Availability = mongoose.model('Availability');
+    await Availability.bookPeriod(hotelId, roomId, checkIn, checkOut, guests.adults);
+    
+    return booking;
+  } catch (error) {
+    console.error('Error in createBooking:', error)
+    if (error.name === 'ValidationError') {
+      console.error('Validation errors:', error.errors)
+    }
+    throw error
   }
-  
-  const bookingNumber = await this.generateBookingNumber();
-  
-  const booking = new this({
-    ...bookingData,
-    bookingNumber
-  });
-  
-  await booking.save();
-  
-  const Availability = mongoose.model('Availability');
-  await Availability.bookPeriod(hotelId, roomId, checkIn, checkOut, guests.adults);
-  
-  return booking;
 };
 
 const Booking = mongoose.model('Booking', bookingSchema);

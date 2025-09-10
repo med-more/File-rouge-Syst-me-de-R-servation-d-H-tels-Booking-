@@ -517,6 +517,77 @@ exports.getHotelBookings = async (req, res) => {
   }
 };
 
+// Nouvelle fonction pour annuler une réservation (pour les utilisateurs)
+exports.cancelBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    console.log('cancelBooking called:', { id, reason });
+    console.log('req.user:', req.user);
+
+    const booking = await Booking.findById(id);
+    if (!booking) {
+      console.log('Booking not found:', id);
+      return res.status(404).json({ message: 'Booking not found' });
+    }
+
+    const userObjectId = new mongoose.Types.ObjectId(req.user.userId);
+    const bookingUserObjectId = new mongoose.Types.ObjectId(booking.userId);
+    
+    console.log('Checking ownership:', { 
+      userId: req.user.userId, 
+      bookingUserId: booking.userId.toString(),
+      isOwner: userObjectId.equals(bookingUserObjectId)
+    });
+    
+    if (!userObjectId.equals(bookingUserObjectId)) {
+      console.log('Access denied: user is not the owner of the booking');
+      return res.status(403).json({ message: 'Access denied. You can only cancel your own bookings.' });
+    }
+
+    // Vérifier si la réservation peut être annulée
+    if (booking.status === 'cancelled') {
+      return res.status(400).json({ message: 'Booking is already cancelled' });
+    }
+
+    if (booking.status === 'confirmed' && new Date(booking.checkIn) <= new Date()) {
+      return res.status(400).json({
+        message: 'Cannot cancel confirmed booking that has already started'
+      });
+    }
+
+    // Marquer la réservation comme annulée
+    booking.status = 'cancelled';
+    booking.paymentStatus = 'refunded';
+    booking.cancelledAt = new Date();
+    booking.cancellationReason = reason || 'Cancelled by user';
+
+    console.log('Updating booking to cancelled:', {
+      status: booking.status,
+      paymentStatus: booking.paymentStatus,
+      cancelledAt: booking.cancelledAt
+    });
+
+    await booking.save();
+
+    console.log('Booking cancelled successfully');
+
+    const updatedBooking = await Booking.findById(id)
+      .populate('userId', 'name email')
+      .populate('hotelId', 'name location')
+      .populate('roomId', 'type pricePerNight');
+
+    res.json({
+      message: 'Booking cancelled successfully',
+      booking: updatedBooking
+    });
+  } catch (error) {
+    console.error('Cancel booking error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 exports.deleteBooking = async (req, res) => {
   try {
     const { id } = req.params;
@@ -912,9 +983,51 @@ exports.getBookingById = async (req, res) => {
   }
 };
 
+// Fonction de debug temporaire
+exports.debugAllBookings = async (req, res) => {
+  try {
+    const allBookings = await Booking.find({})
+      .populate('userId', 'name email')
+      .populate('hotelId', 'name location')
+      .populate('roomId', 'type description pricePerNight')
+      .sort({ createdAt: -1 });
+    
+    console.log('All bookings in database:', allBookings.length);
+    allBookings.forEach(booking => {
+      console.log(`Booking ${booking._id}:`, {
+        userId: booking.userId?._id,
+        userName: booking.userId?.name,
+        status: booking.status,
+        paymentStatus: booking.paymentStatus,
+        hotelName: booking.hotelId?.name
+      });
+    });
+    
+    res.json({
+      totalBookings: allBookings.length,
+      bookings: allBookings.map(b => ({
+        _id: b._id,
+        userId: b.userId?._id,
+        userName: b.userId?.name,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        hotelName: b.hotelId?.name,
+        createdAt: b.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ message: 'Debug error', error: error.message });
+  }
+};
+
 exports.getUserBookings = async (req, res) => {
   try {
     const { userId } = req.params;
+    console.log('getUserBookings called with userId:', userId);
+    console.log('req.user:', req.user);
+    console.log('req.user.userId:', req.user?.userId);
+    
     const {
       status,
       paymentStatus,
@@ -926,7 +1039,14 @@ exports.getUserBookings = async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
+    // Vérification d'authentification plus flexible pour debug
+    if (!req.user || !req.user.userId) {
+      console.log('No user in request');
+      return res.status(401).json({ message: 'Authentication required' });
+    }
+
     if (req.user.userId !== userId) {
+      console.log('Access denied: userId mismatch', { requested: userId, authenticated: req.user.userId });
       return res.status(403).json({ message: 'Access denied. You can only view your own bookings.' });
     }
 
@@ -963,6 +1083,10 @@ exports.getUserBookings = async (req, res) => {
       .limit(parseInt(limit));
 
     const total = await Booking.countDocuments(filter);
+    
+    console.log('Found bookings:', bookings.length);
+    console.log('Total bookings for user:', total);
+    console.log('Filter used:', filter);
 
     const totalBookings = await Booking.countDocuments({ userId });
     const confirmedBookings = await Booking.countDocuments({ userId, status: 'confirmed' });
@@ -1039,6 +1163,9 @@ exports.getUserBookings = async (req, res) => {
 
 exports.createBooking = async (req, res) => {
   try {
+    console.log('Create booking request body:', req.body)
+    console.log('User ID:', req.user?.userId)
+    
     const {
       hotelId,
       roomId,
@@ -1059,7 +1186,18 @@ exports.createBooking = async (req, res) => {
       userAgent
     } = req.body;
 
-    const userId = req.user.userId; 
+    const userId = req.user.userId;
+    
+    console.log('Extracted data:', {
+      hotelId,
+      roomId,
+      checkIn,
+      checkOut,
+      guests,
+      guestDetails,
+      pricePerNight,
+      userId
+    }) 
 
     const hotel = await Hotel.findById(hotelId);
     if (!hotel) {
@@ -1135,6 +1273,8 @@ exports.createBooking = async (req, res) => {
       userAgent
     };
 
+    console.log('Booking data to create:', bookingData)
+    
     const booking = await Booking.createBooking(bookingData);
 
     await booking.populate([
@@ -1174,6 +1314,25 @@ exports.createBooking = async (req, res) => {
 
   } catch (error) {
     console.error('Booking creation error:', error);
+    
+    if (error.name === 'ValidationError') {
+      const errors = Object.values(error.errors).map(err => ({
+        field: err.path,
+        message: err.message
+      }));
+      
+      return res.status(400).json({
+        message: 'Validation error',
+        errors: errors
+      });
+    }
+    
+    if (error.message.includes('not found') || error.message.includes('not available')) {
+      return res.status(400).json({
+        message: error.message
+      });
+    }
+    
     res.status(500).json({ 
       message: 'Server error', 
       error: error.message 

@@ -10,6 +10,7 @@ router.use(adminMiddleware);
 
 // Dashboard et statistiques
 router.get('/dashboard', adminController.getDashboardStats);
+router.get('/test-data', adminController.testData);
 
 // Gestion des hôtels
 router.get('/hotels', adminController.getHotels);

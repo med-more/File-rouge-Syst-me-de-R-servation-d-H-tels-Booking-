@@ -17,9 +17,11 @@ import {
   Plus,
   ChevronDown,
   AlertTriangle,
+  X,
 } from "lucide-react"
 import axios from "axios"
 import { toast } from "react-toastify"
+import AdminLayout from "../../components/layout/AdminLayout"
 
 const ManageUsers = () => {
   const [users, setUsers] = useState([])
@@ -31,6 +33,13 @@ const ManageUsers = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [userToDelete, setUserToDelete] = useState(null)
   const [showBulkActions, setShowBulkActions] = useState(false)
+  const [showViewModal, setShowViewModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState(null)
+  const [editForm, setEditForm] = useState({
+    role: '',
+    isActive: true
+  })
 
   const roles = [
     { value: "all", label: "All Roles" },
@@ -109,6 +118,61 @@ const ManageUsers = () => {
     } catch (error) {
       console.error("Error updating user status:", error)
       toast.error(error.response?.data?.message || "Failed to update user status")
+    }
+  }
+
+  const handleViewUser = (user) => {
+    setSelectedUser(user)
+    setShowViewModal(true)
+  }
+
+  const handleEditUser = (user) => {
+    setSelectedUser(user)
+    setEditForm({
+      role: user.role || 'user',
+      isActive: user.isActive !== false
+    })
+    setShowEditModal(true)
+  }
+
+  const handleEditFormChange = (field, value) => {
+    setEditForm(prev => ({
+      ...prev,
+      [field]: value
+    }))
+  }
+
+  const handleSaveUser = async () => {
+    if (!selectedUser) return
+
+    try {
+      // Mettre à jour le rôle et le statut séparément
+      const roleResponse = await axios.put(`http://localhost:5000/api/admin/users/${selectedUser._id}/role`, {
+        role: editForm.role
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+
+      const statusResponse = await axios.put(`http://localhost:5000/api/admin/users/${selectedUser._id}/status`, {
+        status: editForm.isActive ? 'active' : 'inactive'
+      }, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+
+      if (roleResponse.data.success && statusResponse.data.success) {
+        toast.success("User updated successfully")
+        setShowEditModal(false)
+        fetchUsers() // Refresh the users list
+      } else {
+        toast.error("Failed to update user")
+      }
+    } catch (error) {
+      console.error("Error updating user:", error)
+      toast.error(error.response?.data?.message || "Failed to update user")
     }
   }
 
@@ -228,7 +292,8 @@ const ManageUsers = () => {
   }
 
   return (
-    <div className="min-h-screen pt-32 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
+    <AdminLayout>
+      <div className="min-h-screen pt-8 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
       {/* Background Spots - Style premium */}
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -459,10 +524,18 @@ const ManageUsers = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center space-x-2">
-                          <button className="p-2 text-gray-400 hover:text-blue-600 transition-colors">
+                        <button 
+                          onClick={() => handleViewUser(user)}
+                          className="p-2 text-gray-400 hover:text-blue-600 transition-colors"
+                          title="View User"
+                        >
                           <Eye className="h-4 w-4" />
                         </button>
-                          <button className="p-2 text-gray-400 hover:text-yellow-600 transition-colors">
+                        <button 
+                          onClick={() => handleEditUser(user)}
+                          className="p-2 text-gray-400 hover:text-yellow-600 transition-colors"
+                          title="Edit User"
+                        >
                           <Edit className="h-4 w-4" />
                         </button>
                         <button
@@ -471,11 +544,9 @@ const ManageUsers = () => {
                             setShowDeleteModal(true)
                           }}
                           className="p-2 text-gray-400 hover:text-red-600 transition-colors"
+                          title="Delete User"
                         >
                           <Trash2 className="h-4 w-4" />
-                        </button>
-                        <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors">
-                          <MoreHorizontal className="h-4 w-4" />
                         </button>
                       </div>
                     </td>
@@ -538,9 +609,138 @@ const ManageUsers = () => {
             </div>
           </div>
         )}
+
+        {/* View User Modal */}
+        {showViewModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">User Details</h3>
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Name</label>
+                  <p className="text-gray-900">{selectedUser.name || selectedUser.firstName + ' ' + selectedUser.lastName}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <p className="text-gray-900">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Role</label>
+                  <p className="text-gray-900 capitalize">{selectedUser.role || 'User'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Status</label>
+                  <p className="text-gray-900 capitalize">{selectedUser.isActive !== false ? 'Active' : 'Inactive'}</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Created At</label>
+                  <p className="text-gray-900">{new Date(selectedUser.createdAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+              
+              <div className="flex justify-end mt-6">
+                <button
+                  onClick={() => setShowViewModal(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit User Modal */}
+        {showEditModal && selectedUser && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 max-w-md w-full mx-4">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Edit User</h3>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <X className="h-6 w-6" />
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Name</label>
+                  <input
+                    type="text"
+                    value={selectedUser.name || selectedUser.firstName + ' ' + selectedUser.lastName}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Name cannot be changed</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    value={selectedUser.email}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                    readOnly
+                    disabled
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Role</label>
+                  <select
+                    value={editForm.role}
+                    onChange={(e) => handleEditFormChange('role', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="user">User</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Status</label>
+                  <select
+                    value={editForm.isActive ? 'active' : 'inactive'}
+                    onChange={(e) => handleEditFormChange('isActive', e.target.value === 'active')}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveUser}
+                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         </div>
       </div>
-    </div>
+      </div>
+    </AdminLayout>
   )
 }
 

@@ -31,7 +31,7 @@ exports.register = async (req, res) => {
     
     // Générer un code de vérification à 6 chiffres
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const verificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    const verificationExpires = Date.now() + 10 * 60 * 1000; // 10 min expire
     
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
@@ -45,7 +45,7 @@ exports.register = async (req, res) => {
       isEmailVerified: false,
     });
 
-    // Vérifier la configuration email
+    // Vérifier la configuration email si email verified or not 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
       console.error('Email configuration missing. Please set EMAIL_USER and EMAIL_PASS in .env');
       // On continue sans envoyer l'email, l'utilisateur peut demander un nouveau code
@@ -58,7 +58,7 @@ exports.register = async (req, res) => {
           pass: process.env.EMAIL_PASS,
         },
       });
-
+        //template de code de verification 
       const mailOptions = {
         from: process.env.EMAIL_USER,
         to: user.email,
@@ -99,6 +99,8 @@ exports.register = async (req, res) => {
   }
 };
 
+
+//the login function 
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -110,7 +112,7 @@ exports.login = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
-    // Bloquer si email non vérifié
+    // Bloquer si email non vérifié!
     if (!user.isEmailVerified) {
       return res.status(403).json({ 
         message: 'Email non vérifié. Veuillez vérifier votre email.',
@@ -205,6 +207,8 @@ exports.forgotPassword = async (req, res) => {
     const resetUrl = `${frontendBaseUrl}/reset-password/${encodeURIComponent(resetToken)}`;
     console.log('RESET URL (for test):', resetUrl);
 
+
+    //template for reset the password 
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: user.email,
@@ -360,8 +364,10 @@ exports.resendVerificationCode = async (req, res) => {
 // Vérifier l'authentification de l'utilisateur
 exports.getMe = async (req, res) => {
   try {
+    console.log('getMe called with req.user:', req.user);
     // L'utilisateur est déjà vérifié par le middleware d'authentification
     const user = await User.findById(req.user.userId).select('-password');
+    console.log('Found user:', user ? { _id: user._id, name: user.name, email: user.email } : 'null');
     
     if (!user) {
       return res.status(404).json({ message: 'Utilisateur non trouvé' });
@@ -369,7 +375,8 @@ exports.getMe = async (req, res) => {
 
     res.json({ 
       user: {
-        id: user._id,
+        _id: user._id, // ✅ Utiliser _id pour cohérence avec le frontend
+        id: user._id,  // ✅ Garder id aussi pour compatibilité
         name: user.name,
         email: user.email,
         role: user.role,

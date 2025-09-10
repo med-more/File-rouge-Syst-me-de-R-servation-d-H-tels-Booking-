@@ -1,5 +1,7 @@
 const User = require('../models/User');
 
+
+//update user data
 exports.updateProfile = async (req, res) => {
   try {
     const { name, email, phone, address, profileImage } = req.body;
@@ -38,6 +40,8 @@ exports.updateProfile = async (req, res) => {
   }
 };
 
+
+//get the user informations
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.userId;
@@ -53,6 +57,8 @@ exports.getProfile = async (req, res) => {
   }
 };
 
+
+//delete permently the account of user 
 exports.deleteAccount = async (req, res) => {
   try {
     const userId = req.user.userId;

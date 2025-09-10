@@ -81,7 +81,7 @@ export const AuthProvider = ({ children }) => {
       const token = localStorage.getItem("token")
       if (token) {
         try {
-          const response = await axios.get('http://localhost:5000/api/auth/me', {
+          const response = await axios.get('/api/auth/me', {
             headers: { Authorization: `Bearer ${token}` }
           })
           
@@ -218,6 +218,13 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem("token")
+    // ✅ Nettoyer aussi les réservations lors de la déconnexion
+    try {
+      localStorage.removeItem('userBookings')
+      localStorage.removeItem('currentBooking')
+    } catch (e) {
+      console.warn('Could not clear booking data from localStorage:', e)
+    }
     dispatch({ type: "LOGOUT" })
     toast.success("Déconnexion réussie")
   }

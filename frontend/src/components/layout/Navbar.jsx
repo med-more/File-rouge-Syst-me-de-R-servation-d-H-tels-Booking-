@@ -67,10 +67,19 @@ const Navbar = () => {
     return location.pathname === path
   }
 
-  const navLinks = [
-    { name: "Hotels", href: "/hotels" },
-    { name: "About", href: "/about" },
-    { name: "Contact", href: "/contact" },
+  // Liens de navigation pour tous les utilisateurs
+  const publicNavLinks = [
+    { name: "Hotels", href: "/hotels", icon: null },
+    { name: "About", href: "/about", icon: null },
+    { name: "Contact", href: "/contact", icon: null },
+  ]
+
+  // Liens de navigation pour les utilisateurs connectés
+  const authenticatedNavLinks = [
+    { name: "Hotels", href: "/hotels", icon: null },
+    { name: "Mes Réservations", href: "/my-bookings", icon: Calendar },
+    { name: "About", href: "/about", icon: null },
+    { name: "Contact", href: "/contact", icon: null },
   ]
 
   // Menu utilisateur normal
@@ -87,6 +96,11 @@ const Navbar = () => {
     { name: "Gestion Utilisateurs", href: "/admin/users", icon: User },
     { name: "Gestion Paiements", href: "/admin/payments", icon: Calendar },
   ]
+
+  // Masquer la navbar pour les admins
+  if (isAdmin) {
+    return null
+  }
 
   return (
     <nav
@@ -117,11 +131,12 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center space-x-6 xl:space-x-8">
-            {navLinks.map((link) => (
+            {/* Navigation normale - masquée pour les admins */}
+            {!isAdmin && (isAuthenticated ? authenticatedNavLinks : publicNavLinks).map((link) => (
               <Link
                 key={link.name}
                 to={link.href}
-                className={`font-medium transition-all duration-200 relative group text-sm xl:text-base ${
+                className={`font-medium transition-all duration-200 relative group text-sm xl:text-base flex items-center space-x-1.5 ${
                   isActivePath(link.href)
                     ? scrolled
                       ? "text-primary-600"
@@ -131,7 +146,8 @@ const Navbar = () => {
                       : "text-white/90 hover:text-white"
                 }`}
               >
-                {link.name}
+                {link.icon && <link.icon className="h-4 w-4" />}
+                <span>{link.name}</span>
                 <span
                   className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-200 group-hover:w-full ${
                     isActivePath(link.href)
@@ -146,34 +162,114 @@ const Navbar = () => {
               </Link>
             ))}
 
-            {/* Admin Navigation Link - Visible seulement pour les admins */}
+            {/* Admin Navigation Links - Visible seulement pour les admins */}
             {isAdmin && (
-              <Link
-                to="/admin"
-                className={`font-medium transition-all duration-200 relative group flex items-center space-x-1.5 sm:space-x-2 text-sm xl:text-base ${
-                  isActivePath("/admin")
-                    ? scrolled
-                      ? "text-yellow-600"
-                      : "text-yellow-300"
-                    : scrolled
-                      ? "text-gray-700 hover:text-yellow-600"
-                      : "text-white/90 hover:text-yellow-300"
-                }`}
-              >
-                <Crown className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span>Admin</span>
-                <span
-                  className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-200 group-hover:w-full ${
+              <>
+                <Link
+                  to="/admin"
+                  className={`font-medium transition-all duration-200 relative group flex items-center space-x-1.5 sm:space-x-2 text-sm xl:text-base ${
                     isActivePath("/admin")
                       ? scrolled
-                        ? "bg-yellow-600 w-full"
-                        : "bg-yellow-300 w-full"
+                        ? "text-yellow-600"
+                        : "text-yellow-300"
                       : scrolled
-                        ? "bg-yellow-600"
-                        : "bg-yellow-300"
+                        ? "text-gray-700 hover:text-yellow-600"
+                        : "text-white/90 hover:text-yellow-300"
                   }`}
-                ></span>
-              </Link>
+                >
+                  <Shield className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Dashboard</span>
+                  <span
+                    className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-200 group-hover:w-full ${
+                      isActivePath("/admin")
+                        ? scrolled
+                          ? "bg-yellow-600 w-full"
+                          : "bg-yellow-300 w-full"
+                        : scrolled
+                          ? "bg-yellow-600"
+                          : "bg-yellow-300"
+                    }`}
+                  ></span>
+                </Link>
+                <Link
+                  to="/admin/hotels"
+                  className={`font-medium transition-all duration-200 relative group flex items-center space-x-1.5 sm:space-x-2 text-sm xl:text-base ${
+                    isActivePath("/admin/hotels")
+                      ? scrolled
+                        ? "text-yellow-600"
+                        : "text-yellow-300"
+                      : scrolled
+                        ? "text-gray-700 hover:text-yellow-600"
+                        : "text-white/90 hover:text-yellow-300"
+                  }`}
+                >
+                  <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Hôtels</span>
+                  <span
+                    className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-200 group-hover:w-full ${
+                      isActivePath("/admin/hotels")
+                        ? scrolled
+                          ? "bg-yellow-600 w-full"
+                          : "bg-yellow-300 w-full"
+                        : scrolled
+                          ? "bg-yellow-600"
+                          : "bg-yellow-300"
+                    }`}
+                  ></span>
+                </Link>
+                <Link
+                  to="/admin/users"
+                  className={`font-medium transition-all duration-200 relative group flex items-center space-x-1.5 sm:space-x-2 text-sm xl:text-base ${
+                    isActivePath("/admin/users")
+                      ? scrolled
+                        ? "text-yellow-600"
+                        : "text-yellow-300"
+                      : scrolled
+                        ? "text-gray-700 hover:text-yellow-600"
+                        : "text-white/90 hover:text-yellow-300"
+                  }`}
+                >
+                  <User className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Utilisateurs</span>
+                  <span
+                    className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-200 group-hover:w-full ${
+                      isActivePath("/admin/users")
+                        ? scrolled
+                          ? "bg-yellow-600 w-full"
+                          : "bg-yellow-300 w-full"
+                        : scrolled
+                          ? "bg-yellow-600"
+                          : "bg-yellow-300"
+                    }`}
+                  ></span>
+                </Link>
+                <Link
+                  to="/admin/payments"
+                  className={`font-medium transition-all duration-200 relative group flex items-center space-x-1.5 sm:space-x-2 text-sm xl:text-base ${
+                    isActivePath("/admin/payments")
+                      ? scrolled
+                        ? "text-yellow-600"
+                        : "text-yellow-300"
+                      : scrolled
+                        ? "text-gray-700 hover:text-yellow-600"
+                        : "text-white/90 hover:text-yellow-300"
+                  }`}
+                >
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span>Paiements</span>
+                  <span
+                    className={`absolute -bottom-1 left-0 w-0 h-0.5 transition-all duration-200 group-hover:w-full ${
+                      isActivePath("/admin/payments")
+                        ? scrolled
+                          ? "bg-yellow-600 w-full"
+                          : "bg-yellow-300 w-full"
+                        : scrolled
+                          ? "bg-yellow-600"
+                          : "bg-yellow-300"
+                    }`}
+                  ></span>
+                </Link>
+              </>
             )}
           </div>
 
@@ -181,30 +277,35 @@ const Navbar = () => {
           <div className="hidden lg:flex items-center space-x-3 xl:space-x-4">
             {isAuthenticated ? (
               <>
-                {/* Notifications */}
-                <button
-                  className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 relative ${
-                    scrolled
-                      ? "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
-                      : "text-white/90 hover:text-white hover:bg-white/10"
-                  }`}
-                >
-                  <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full"></span>
-                </button>
+                {/* Notifications et Favorites - masqués pour les admins */}
+                {!isAdmin && (
+                  <>
+                    {/* Notifications */}
+                    <button
+                      className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 relative ${
+                        scrolled
+                          ? "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
+                          : "text-white/90 hover:text-white hover:bg-white/10"
+                      }`}
+                    >
+                      <Bell className="h-4 w-4 sm:h-5 sm:w-5" />
+                      <span className="absolute -top-0.5 -right-0.5 sm:-top-1 sm:-right-1 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-red-500 rounded-full"></span>
+                    </button>
 
-                {/* Favorites */}
-                <Link
-                  to="/favorites"
-                  className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 ${
-                    scrolled
-                      ? "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
-                      : "text-white/90 hover:text-white hover:bg-white/10"
-                  }`}
-                  title="Mes favoris"
-                >
-                  <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
-                </Link>
+                    {/* Favorites */}
+                    <Link
+                      to="/favorites"
+                      className={`p-1.5 sm:p-2 rounded-lg sm:rounded-xl transition-all duration-200 ${
+                        scrolled
+                          ? "text-gray-600 hover:text-primary-600 hover:bg-gray-100"
+                          : "text-white/90 hover:text-white hover:bg-white/10"
+                      }`}
+                      title="Mes favoris"
+                    >
+                      <Heart className="h-4 w-4 sm:h-5 sm:w-5" />
+                    </Link>
+                  </>
+                )}
 
                 {/* User Menu */}
                 <div className="relative">
@@ -257,23 +358,25 @@ const Navbar = () => {
                         )}
                       </div>
 
-                      {/* Menu utilisateur normal */}
-                      <div className="py-1">
-                        <p className="px-3 sm:px-4 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                          Mon Compte
-                        </p>
-                        {userMenuItems.map((item) => (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            onClick={() => setShowUserMenu(false)}
-                            className="flex items-center px-3 sm:px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                          >
-                            <item.icon className="h-4 w-4 mr-2.5 text-gray-500" />
-                            {item.name}
-                          </Link>
-                        ))}
-                      </div>
+                      {/* Menu utilisateur normal - masqué pour les admins */}
+                      {!isAdmin && (
+                        <div className="py-1">
+                          <p className="px-3 sm:px-4 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Mon Compte
+                          </p>
+                          {userMenuItems.map((item) => (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              onClick={() => setShowUserMenu(false)}
+                              className="flex items-center px-3 sm:px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                              <item.icon className="h-4 w-4 mr-2.5 text-gray-500" />
+                              {item.name}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
 
                       {/* Menu admin - seulement pour les admins */}
                       {isAdmin && (
@@ -346,35 +449,75 @@ const Navbar = () => {
         {isOpen && (
           <div className="lg:hidden mobile-menu">
             <div className="px-2 pt-2 pb-3 space-y-1 bg-white/95 backdrop-blur-md rounded-xl sm:rounded-2xl mt-2 shadow-soft border border-gray-100 max-h-[80vh] overflow-y-auto">
-              {navLinks.map((link) => (
+              {/* Navigation normale - masquée pour les admins */}
+              {!isAdmin && (isAuthenticated ? authenticatedNavLinks : publicNavLinks).map((link) => (
                 <Link
                   key={link.name}
                   to={link.href}
                   onClick={() => setIsOpen(false)}
-                  className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors ${
+                  className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors flex items-center space-x-2 ${
                     isActivePath(link.href)
                       ? "text-primary-600 bg-primary-50"
                       : "text-gray-700 hover:text-primary-600 hover:bg-gray-50"
                   }`}
                 >
-                  {link.name}
+                  {link.icon && <link.icon className="h-4 w-4 sm:h-5 sm:w-5" />}
+                  <span>{link.name}</span>
                 </Link>
               ))}
 
-              {/* Admin Navigation Link Mobile */}
+              {/* Admin Navigation Links Mobile - Visible seulement pour les admins */}
               {isAdmin && (
-                <Link
-                  to="/admin"
-                  onClick={() => setIsOpen(false)}
-                  className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors flex items-center space-x-2 ${
-                    isActivePath("/admin")
-                      ? "text-yellow-600 bg-yellow-50"
-                      : "text-gray-700 hover:text-yellow-600 hover:bg-yellow-50"
-                  }`}
-                >
-                  <Crown className="h-4 w-4 sm:h-5 sm:w-5" />
-                  <span>Admin</span>
-                </Link>
+                <>
+                  <Link
+                    to="/admin"
+                    onClick={() => setIsOpen(false)}
+                    className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors flex items-center space-x-2 ${
+                      isActivePath("/admin")
+                        ? "text-yellow-600 bg-yellow-50"
+                        : "text-gray-700 hover:text-yellow-600 hover:bg-yellow-50"
+                    }`}
+                  >
+                    <Shield className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Dashboard</span>
+                  </Link>
+                  <Link
+                    to="/admin/hotels"
+                    onClick={() => setIsOpen(false)}
+                    className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors flex items-center space-x-2 ${
+                      isActivePath("/admin/hotels")
+                        ? "text-yellow-600 bg-yellow-50"
+                        : "text-gray-700 hover:text-yellow-600 hover:bg-yellow-50"
+                    }`}
+                  >
+                    <Settings className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Hôtels</span>
+                  </Link>
+                  <Link
+                    to="/admin/users"
+                    onClick={() => setIsOpen(false)}
+                    className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors flex items-center space-x-2 ${
+                      isActivePath("/admin/users")
+                        ? "text-yellow-600 bg-yellow-50"
+                        : "text-gray-700 hover:text-yellow-600 hover:bg-yellow-50"
+                    }`}
+                  >
+                    <User className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Utilisateurs</span>
+                  </Link>
+                  <Link
+                    to="/admin/payments"
+                    onClick={() => setIsOpen(false)}
+                    className={`block px-3 py-2.5 sm:py-3 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium transition-colors flex items-center space-x-2 ${
+                      isActivePath("/admin/payments")
+                        ? "text-yellow-600 bg-yellow-50"
+                        : "text-gray-700 hover:text-yellow-600 hover:bg-yellow-50"
+                    }`}
+                  >
+                    <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
+                    <span>Paiements</span>
+                  </Link>
+                </>
               )}
 
               {isAuthenticated ? (
@@ -410,23 +553,25 @@ const Navbar = () => {
                     </div>
                   </div>
 
-                  {/* Menu utilisateur mobile */}
-                  <div className="mb-2">
-                    <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                      Mon Compte
-                    </p>
-                    {userMenuItems.map((item) => (
-                      <Link
-                        key={item.name}
-                        to={item.href}
-                        onClick={() => setIsOpen(false)}
-                        className="flex items-center px-3 py-2 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 transition-colors"
-                      >
-                        <item.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2.5 text-gray-500" />
-                        {item.name}
-                      </Link>
-                    ))}
-                  </div>
+                  {/* Menu utilisateur mobile - masqué pour les admins */}
+                  {!isAdmin && (
+                    <div className="mb-2">
+                      <p className="px-3 py-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        Mon Compte
+                      </p>
+                      {userMenuItems.map((item) => (
+                        <Link
+                          key={item.name}
+                          to={item.href}
+                          onClick={() => setIsOpen(false)}
+                          className="flex items-center px-3 py-2 rounded-lg sm:rounded-xl text-sm sm:text-base font-medium text-gray-700 hover:text-primary-600 hover:bg-gray-50 transition-colors"
+                        >
+                          <item.icon className="h-4 w-4 sm:h-5 sm:w-5 mr-2.5 text-gray-500" />
+                          {item.name}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Menu admin mobile */}
                   {isAdmin && (

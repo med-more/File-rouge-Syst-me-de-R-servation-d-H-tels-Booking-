@@ -22,6 +22,7 @@ import {
 } from "lucide-react"
 import axios from "axios"
 import { toast } from "react-toastify"
+import AdminLayout from "../../components/layout/AdminLayout"
 
 const HotelSchema = Yup.object().shape({
   name: Yup.string().required("Hotel name is required"),
@@ -35,7 +36,7 @@ const HotelSchema = Yup.object().shape({
 const RoomSchema = Yup.object().shape({
   name: Yup.string().required("Room name is required"),
   type: Yup.string().oneOf(['single','double','triple','suite','family','deluxe','presidential']).required("Room type is required"),
-  description: Yup.string().required("Room description is required"),
+  description: Yup.string().min(10, "Description must be at least 10 characters").required("Room description is required"),
   pricePerNight: Yup.number().min(1, "Price must be greater than 0").required("Price is required"),
   maxGuests: Yup.number().min(1).max(10).required("Max guests is required"),
   quantity: Yup.number().min(1).required("Quantity is required"),
@@ -163,7 +164,8 @@ const ManageHotels = () => {
       setShowModal(false)
       resetForm()
     } catch (error) {
-      toast.error(error.response?.data?.message || "Failed to add room")
+      const serverMsg = error.response?.data?.errors?.[0]?.msg || error.response?.data?.message
+      toast.error(serverMsg || "Failed to add room")
     } finally {
       setSubmitting(false)
     }
@@ -228,7 +230,8 @@ const ManageHotels = () => {
   }) || []
 
   return (
-    <div className="min-h-screen pt-32 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
+    <AdminLayout>
+      <div className="min-h-screen pt-8 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
       {/* Background Spots - Style premium */}
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -723,7 +726,8 @@ const ManageHotels = () => {
         )}
         </div>
       </div>
-    </div>
+      </div>
+    </AdminLayout>
   )
 }
 

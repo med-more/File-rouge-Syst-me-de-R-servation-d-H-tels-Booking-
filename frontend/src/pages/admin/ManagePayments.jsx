@@ -22,6 +22,8 @@ import {
 } from "lucide-react"
 import axios from "axios"
 import { toast } from "react-toastify"
+import AdminLayout from "../../components/layout/AdminLayout"
+import { formatCurrencyMAD } from "../../utils/helpers"
 
 const ManagePayments = () => {
   const [payments, setPayments] = useState([])
@@ -40,12 +42,17 @@ const ManagePayments = () => {
     refundedPayments: 0,
   })
 
+  const getAuthHeaders = () => {
+    const token = localStorage.getItem('token')
+    return token ? { Authorization: `Bearer ${token}` } : {}
+  }
+
   const statusConfig = {
     completed: {
       icon: CheckCircle,
       color: "text-green-600",
       bg: "bg-green-100",
-      label: "Completed",
+      label: "Accepted",
     },
     pending: {
       icon: Clock,
@@ -85,50 +92,41 @@ const ManagePayments = () => {
 
   useEffect(() => {
     fetchPayments()
-    fetchPaymentStats()
   }, [])
 
   const fetchPayments = async () => {
     setLoading(true)
     try {
-      // Simuler un délai de chargement
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      
-      // Données statiques pour les paiements
-      const staticPayments = [
-        {
-          _id: "1",
-          bookingId: "BK001",
-          userEmail: "jean.dupont@example.com",
-          hotelName: "Hôtel Luxe Paris",
-          amount: 450,
-          status: "completed",
-          date: "2024-03-15",
-          paymentMethod: "credit_card"
-        },
-        {
-          _id: "2",
-          bookingId: "BK002",
-          userEmail: "marie.martin@example.com",
-          hotelName: "Grand Hôtel Lyon",
-          amount: 320,
-          status: "pending",
-          date: "2024-03-14",
-          paymentMethod: "paypal"
-        },
-        {
-          _id: "3",
-          bookingId: "BK003",
-          userEmail: "pierre.durand@example.com",
-          hotelName: "Hôtel Riviera Nice",
-          amount: 580,
-          status: "failed",
-          date: "2024-03-13",
-          paymentMethod: "credit_card"
+      const { data } = await axios.get('/api/admin/bookings?limit=200&sortBy=createdAt&sortOrder=desc', { headers: getAuthHeaders() })
+      const bookings = Array.isArray(data?.bookings) ? data.bookings : []
+      const mapped = bookings.map(b => {
+        const normalizeStatus = () => {
+          const ps = (b.paymentStatus || '').toLowerCase()
+          const bs = (b.status || '').toLowerCase()
+          // Priorité au paymentStatus pour l'affichage (cohérent avec MyBookings)
+          if (ps === 'paid' || bs === 'confirmed' || bs === 'completed') return 'completed'
+          if (ps === 'refunded' || bs === 'cancelled') return 'refunded'
+          if (ps === 'failed') return 'failed'
+          if (ps === 'pending' || bs === 'pending') return 'pending'
+          return 'pending'
         }
-      ]
-      
-      setPayments(staticPayments)
+
+        return {
+          _id: b._id,
+          bookingId: b.bookingNumber || b._id,
+          userEmail: b.userId?.email,
+          userName: b.userId?.name,
+          hotelName: b.hotelId?.name,
+          amount: Number(b.totalPrice ?? b.calculatedTotalPrice ?? b.finalPrice ?? 0),
+          currency: 'MAD',
+          status: normalizeStatus(),
+          date: b.createdAt,
+          paymentMethod: b.paymentMethod || 'credit_card',
+          createdAt: b.createdAt,
+        }
+      })
+      setPayments(mapped)
+      computeStats(mapped)
     } catch (error) {
       console.error("Erreur lors du chargement des paiements:", error)
       toast.error("Erreur lors du chargement des paiements")
@@ -138,57 +136,57 @@ const ManagePayments = () => {
     }
   }
 
-  const fetchPaymentStats = async () => {
-    try {
-      // Données statiques pour les statistiques
-      const staticStats = {
-        totalRevenue: 125000,
-        totalTransactions: 450,
-        successfulPayments: 420,
-        failedPayments: 20,
-        pendingPayments: 10,
-        refundedPayments: 5
-      }
-      
-      setStats(staticStats)
-    } catch (error) {
-      console.error("Erreur lors du chargement des statistiques:", error)
-      toast.error("Erreur lors du chargement des statistiques")
-    }
+  const computeStats = (rows) => {
+    const totalRevenue = rows.filter(r => r.status === 'completed').reduce((sum, r) => sum + (r.amount || 0), 0)
+    const totalTransactions = rows.length
+    const successfulPayments = rows.filter(r => r.status === 'completed').length
+    const failedPayments = rows.filter(r => r.status === 'failed').length
+    const pendingPayments = rows.filter(r => r.status === 'pending').length
+    const refundedPayments = rows.filter(r => r.status === 'refunded').length
+    setStats({ totalRevenue, totalTransactions, successfulPayments, failedPayments, pendingPayments, refundedPayments })
   }
 
   const handleRefund = async (paymentId, amount) => {
     try {
-      await axios.post(`/api/admin/payments/${paymentId}/refund`, { amount })
-      toast.success("Refund processed successfully")
-      fetchPayments()
-      fetchPaymentStats()
+      // Pas d'endpoint paiements dédié: on annule la réservation associée
+      await axios.patch(`/api/admin/bookings/${paymentId}/status`, { status: 'cancelled', paymentStatus: 'refunded' }, { headers: getAuthHeaders() })
+      toast.success("Refund processed (booking cancelled)")
+      // Optimistic update - utiliser le même statut que le backend
+      setPayments(prev => prev.map(p => p._id === paymentId ? { ...p, status: 'cancelled', paymentStatus: 'refunded' } : p))
+      await fetchPayments()
+      try { localStorage.setItem('bookingStatusUpdated', String(Date.now())) } catch {}
     } catch (error) {
-      toast.error("Failed to process refund")
+      const msg = error.response?.data?.message || 'Failed to process refund'
+      toast.error(msg)
     }
   }
 
   const handleConfirmPayment = async (paymentId) => {
     try {
-      await axios.post(`/api/admin/payments/${paymentId}/confirm`)
-      toast.success("Payment confirmed successfully")
-      fetchPayments()
-      fetchPaymentStats()
+      await axios.patch(`/api/admin/bookings/${paymentId}/status`, { status: 'confirmed', paymentStatus: 'paid' }, { headers: getAuthHeaders() })
+      toast.success("Payment confirmed")
+      // Optimistic update - utiliser le même statut que le backend
+      setPayments(prev => prev.map(p => p._id === paymentId ? { ...p, status: 'confirmed', paymentStatus: 'paid' } : p))
+      await fetchPayments()
+      try { localStorage.setItem('bookingStatusUpdated', String(Date.now())) } catch {}
     } catch (error) {
-      toast.error("Failed to confirm payment")
+      const msg = error.response?.data?.message || 'Failed to confirm payment'
+      toast.error(msg)
     }
   }
 
   const exportPayments = async () => {
     try {
-      const response = await axios.get("/api/admin/payments/export", {
+      const response = await axios.get("/api/admin/bookings", {
+        headers: getAuthHeaders(),
         responseType: "blob",
       })
 
-      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const blob = response.data instanceof Blob ? response.data : new Blob([JSON.stringify(response.data)], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
       const link = document.createElement("a")
       link.href = url
-      link.setAttribute("download", "payments-export.csv")
+      link.setAttribute("download", "payments-export.json")
       document.body.appendChild(link)
       link.click()
       link.remove()
@@ -271,7 +269,8 @@ const ManagePayments = () => {
   }
 
   return (
-    <div className="min-h-screen pt-32 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
+    <AdminLayout>
+      <div className="min-h-screen pt-8 flex flex-col items-center justify-center relative overflow-hidden bg-gray-50">
       {/* Background Spots - Style premium */}
       <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-30"></div>
       <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-yellow-400 rounded-full mix-blend-multiply filter blur-3xl opacity-20"></div>
@@ -438,9 +437,9 @@ const ManagePayments = () => {
                       </td>
                       <td className="px-6 py-4">
                           <div className="text-sm font-extrabold text-blue-700">
-                          ${payment.amount?.toLocaleString() || "0"}
+                          {formatCurrencyMAD(payment.amount || 0)}
                         </div>
-                          <div className="text-xs text-gray-400">{payment.currency || "USD"}</div>
+                          <div className="text-xs text-gray-400">MAD</div>
                       </td>
                       <td className="px-6 py-4">
                         <div
@@ -602,7 +601,8 @@ const ManagePayments = () => {
         )}
         </div>
       </div>
-    </div>
+      </div>
+    </AdminLayout>
   )
 }
 

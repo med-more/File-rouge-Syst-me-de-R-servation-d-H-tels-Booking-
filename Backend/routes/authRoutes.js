@@ -35,4 +35,13 @@ router.post('/change-password', authMiddleware, authController.changePassword);
 
 router.get('/me', authMiddleware, authController.getMe);
 
+// Route de test temporaire
+router.get('/test-auth', authMiddleware, (req, res) => {
+  res.json({ 
+    message: 'Auth working', 
+    user: req.user,
+    userId: req.user?.userId 
+  });
+});
+
 module.exports = router;

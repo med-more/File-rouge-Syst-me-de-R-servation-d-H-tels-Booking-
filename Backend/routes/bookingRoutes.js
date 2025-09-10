@@ -18,11 +18,15 @@ const handleValidation = (req, res, next) => {
 
 router.post('/bookings/check-availability', authMiddleware, bookingController.checkAvailability);
 router.get('/bookings/hotel/:hotelId', authMiddleware, bookingController.getHotelBookings);
+router.get('/bookings/user/:userId', authMiddleware, bookingController.getUserBookings);
+// Route de test temporaire
+router.get('/bookings/debug/all', bookingController.debugAllBookings);
 router.get('/bookings/:id', authMiddleware, bookingController.getBookingById);
-router.get('/bookings/:userId', authMiddleware, bookingController.getUserBookings);
 router.post('/bookings', authMiddleware, createBookingValidation, handleValidation, bookingController.createBooking);
 router.post('/bookings/:id/confirm', authMiddleware, bookingController.confirmBooking);
 router.put('/bookings/:id', authMiddleware, bookingController.updateBooking);
 router.delete('/bookings/:id', authMiddleware, bookingController.deleteBooking);
+// Route pour annuler une réservation (pour les utilisateurs)
+router.patch('/bookings/:id/cancel', authMiddleware, bookingController.cancelBooking);
 
 module.exports = router;

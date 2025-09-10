@@ -126,7 +126,7 @@ const Contact = () => {
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Choisissez le moyen qui vous convient le mieux pour nous contacter
             </p>
-          </div>
+                  </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {contactMethods.map((method, index) => (
@@ -158,99 +158,99 @@ const Contact = () => {
                 <div className="mb-8">
                   <h2 className="text-3xl font-black text-gray-900 mb-4">Envoyez-nous un Message</h2>
                   <p className="text-gray-600">Remplissez le formulaire ci-dessous et nous vous répondrons dans les plus brefs délais</p>
-                </div>
+              </div>
 
-                <Formik
-                  initialValues={{
-                    name: "",
-                    email: "",
-                    subject: "",
-                    message: "",
-                  }}
-                  validationSchema={ContactSchema}
-                  onSubmit={handleSubmit}
-                >
-                  {({ isSubmitting }) => (
-                    <Form className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div>
+                    <Formik
+                      initialValues={{
+                        name: "",
+                        email: "",
+                        subject: "",
+                        message: "",
+                      }}
+                      validationSchema={ContactSchema}
+                      onSubmit={handleSubmit}
+                    >
+                      {({ isSubmitting }) => (
+                        <Form className="space-y-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
                           <label htmlFor="name" className="block text-sm font-semibold text-gray-700 mb-2">
                             Votre Nom
-                          </label>
-                          <Field
-                            type="text"
-                            id="name"
-                            name="name"
+                              </label>
+                              <Field
+                                type="text"
+                                id="name"
+                                name="name"
                             className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                             placeholder="Votre nom complet"
-                          />
+                              />
                           <ErrorMessage name="name" component="div" className="mt-1 text-sm text-red-600" />
-                        </div>
-                        <div>
+                            </div>
+                            <div>
                           <label htmlFor="email" className="block text-sm font-semibold text-gray-700 mb-2">
                             Adresse Email
-                          </label>
-                          <Field
-                            type="email"
-                            id="email"
-                            name="email"
+                              </label>
+                              <Field
+                                type="email"
+                                id="email"
+                                name="email"
                             className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                             placeholder="votre@email.com"
-                          />
+                              />
                           <ErrorMessage name="email" component="div" className="mt-1 text-sm text-red-600" />
-                        </div>
-                      </div>
-                      <div>
+                            </div>
+                          </div>
+                          <div>
                         <label htmlFor="subject" className="block text-sm font-semibold text-gray-700 mb-2">
                           Sujet
-                        </label>
-                        <Field
-                          type="text"
-                          id="subject"
-                          name="subject"
+                            </label>
+                            <Field
+                              type="text"
+                              id="subject"
+                              name="subject"
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                           placeholder="Comment pouvons-nous vous aider ?"
-                        />
+                            />
                         <ErrorMessage name="subject" component="div" className="mt-1 text-sm text-red-600" />
-                      </div>
-                      <div>
+                          </div>
+                          <div>
                         <label htmlFor="message" className="block text-sm font-semibold text-gray-700 mb-2">
-                          Message
-                        </label>
-                        <Field
-                          as="textarea"
-                          id="message"
-                          name="message"
-                          rows={6}
+                              Message
+                            </label>
+                            <Field
+                              as="textarea"
+                              id="message"
+                              name="message"
+                              rows={6}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200 resize-none"
                           placeholder="Votre message ici..."
-                        />
+                            />
                         <ErrorMessage name="message" component="div" className="mt-1 text-sm text-red-600" />
-                      </div>
-                      <div className="flex justify-center">
-                        <button
-                          type="submit"
-                          disabled={isSubmitting}
+                          </div>
+                          <div className="flex justify-center">
+                            <button
+                              type="submit"
+                              disabled={isSubmitting}
                           className="w-full px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl font-bold flex items-center justify-center gap-2 shadow-xl hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-4 focus:ring-blue-200 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed hover:scale-105"
-                        >
-                          {isSubmitting ? (
-                            <div className="flex items-center">
+                            >
+                              {isSubmitting ? (
+                                <div className="flex items-center">
                               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
                               Envoi en cours...
-                            </div>
-                          ) : (
+                                </div>
+                              ) : (
                             <>
                               Envoyer le Message
                               <Send className="ml-2 h-5 w-5" />
                             </>
-                          )}
-                        </button>
-                      </div>
-                    </Form>
-                  )}
-                </Formik>
-              </div>
-            </div>
+                              )}
+                            </button>
+                          </div>
+                        </Form>
+                      )}
+                    </Formik>
+                  </div>
+                </div>
 
             {/* Map Section */}
             <div className="relative">
@@ -374,10 +374,10 @@ const Contact = () => {
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Trouvez des réponses aux questions courantes sur notre plateforme de réservation d'hôtels
-            </p>
-          </div>
+              </p>
+            </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             {faqs.map((faq, index) => (
               <div key={index} className="group relative">
                 <div className="absolute inset-0 bg-gradient-to-r opacity-0 group-hover:opacity-100 transition-opacity duration-300 rounded-3xl blur-xl"></div>
@@ -387,7 +387,7 @@ const Contact = () => {
                     {faq.question}
                   </h3>
                   <p className="text-gray-600 leading-relaxed">{faq.answer}</p>
-                </div>
+              </div>
               </div>
             ))}
           </div>
