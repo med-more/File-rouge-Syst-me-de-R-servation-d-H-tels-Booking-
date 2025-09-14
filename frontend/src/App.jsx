@@ -30,6 +30,7 @@ import PaymentPage from "./pages/PaymentPage"
 // Admin Pages
 import AdminDashboard from "./pages/admin/AdminDashboard"
 import ManageHotels from "./pages/admin/ManageHotels"
+import ManageRooms from "./pages/admin/ManageRooms"
 import ManageUsers from "./pages/admin/ManageUsers"
 import ManagePayments from "./pages/admin/ManagePayments"
 
@@ -126,6 +127,14 @@ function App() {
                   element={
                     <AdminRoute>
                       <ManageHotels />
+                    </AdminRoute>
+                  }
+                />
+                <Route
+                  path="/admin/rooms"
+                  element={
+                    <AdminRoute>
+                      <ManageRooms />
                     </AdminRoute>
                   }
                 />

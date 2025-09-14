@@ -206,6 +206,16 @@ const ManageHotels = () => {
     }
   }
 
+  const handleDeleteRoom = async (roomId) => {
+    try {
+      await axios.delete(`http://localhost:5000/api/rooms/${roomId}`);
+      toast.success("Room deleted successfully!");
+      fetchHotels(); // Refresh to update the hotel data
+    } catch (error) {
+      toast.error("Failed to delete room");
+    }
+  };
+
   const openModal = (type, hotel = null) => {
     setModalType(type)
     setSelectedHotel(hotel)
@@ -585,14 +595,37 @@ const ManageHotels = () => {
                         {selectedHotel.rooms?.map((room) => (
                           <div key={room._id} className="border rounded-lg p-4">
                             <div className="flex justify-between items-start">
-                              <div>
-                                <h4 className="font-medium">{room.type}</h4>
+                              <div className="flex-1">
+                                <h4 className="font-medium">{room.name || room.type}</h4>
                                 <p className="text-sm text-gray-600">{room.description}</p>
                                 <p className="text-sm text-gray-500">Max {room.maxGuests} guests</p>
                               </div>
-                              <div className="text-right">
+                              <div className="text-right mr-4">
                                 <span className="font-bold text-primary-600">{formatCurrencyMAD(room.pricePerNight)}/night</span>
                                 <p className="text-sm text-gray-500">{room.quantity} available</p>
+                              </div>
+                              <div className="flex space-x-2">
+                                <button
+                                  onClick={() => {
+                                    // Navigate to room management page with edit mode
+                                    window.open(`/admin/rooms?edit=${room._id}`, '_blank');
+                                  }}
+                                  className="text-blue-600 hover:text-blue-800 p-1"
+                                  title="Edit Room"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Are you sure you want to delete "${room.name || room.type}"?`)) {
+                                      handleDeleteRoom(room._id);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-800 p-1"
+                                  title="Delete Room"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
                               </div>
                             </div>
                           </div>

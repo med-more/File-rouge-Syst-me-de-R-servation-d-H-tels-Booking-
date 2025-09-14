@@ -92,7 +92,7 @@ const roomSchema = new mongoose.Schema({
     }
   }],
   size: {
-    type: Number, // en mètres carrés
+    type: Number, 
     min: 0
   },
   floor: {

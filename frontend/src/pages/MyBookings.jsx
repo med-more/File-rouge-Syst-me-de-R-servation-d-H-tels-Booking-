@@ -60,11 +60,7 @@ const MyBookings = () => {
       console.log('Current bookings:', bookings);
       console.log('Bookings length:', bookings?.length);
       
-      // Test 1: Debug endpoint
-      const debugResponse = await axios.get('/api/bookings/debug/all');
-      console.log('Debug response:', debugResponse.data);
-      
-      // Test 2: Auth test
+      // Test 1: Auth test
       const token = localStorage.getItem('token');
       console.log('Token exists:', !!token);
       console.log('Token preview:', token ? token.substring(0, 20) + '...' : 'null');

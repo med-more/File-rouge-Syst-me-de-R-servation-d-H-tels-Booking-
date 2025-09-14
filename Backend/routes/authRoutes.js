@@ -21,7 +21,6 @@ const handleValidation = (req, res, next) => {
 router.post('/register', registerValidation, handleValidation, authController.register);
 router.post('/login', loginValidation, handleValidation, authController.login);
 router.post('/logout', authController.logout);
-// Limiteurs simples anti-abus
 const authLimiter = rateLimit({ windowMs: 60 * 1000, max: 10 });
 const emailActionLimiter = rateLimit({ windowMs: 60 * 1000, max: 3 });
 
@@ -35,7 +34,6 @@ router.post('/change-password', authMiddleware, authController.changePassword);
 
 router.get('/me', authMiddleware, authController.getMe);
 
-// Route de test temporaire
 router.get('/test-auth', authMiddleware, (req, res) => {
   res.json({ 
     message: 'Auth working', 

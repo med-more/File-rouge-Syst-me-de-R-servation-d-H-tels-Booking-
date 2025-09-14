@@ -286,13 +286,13 @@ const ManagePayments = () => {
                 <p className="text-lg text-blue-700/80">Monitor and manage payment transactions</p>
           </div>
           <div className="flex items-center space-x-3 mt-4 sm:mt-0">
-            <button
+            {/* <button
               onClick={exportPayments}
                   className="bg-gradient-to-r from-blue-100 to-blue-200 text-blue-700 rounded-xl font-semibold flex items-center gap-2 px-6 py-3 shadow hover:from-blue-200 hover:to-blue-300 transition-all duration-200 animate-fade-in-up"
             >
                   <Download className="h-5 w-5 mr-2" />
               Export
-            </button>
+            </button> */}
             <button
               onClick={fetchPayments}
                   className="bg-gradient-to-r from-yellow-400 to-yellow-300 text-yellow-900 rounded-xl font-semibold flex items-center gap-2 px-6 py-3 shadow hover:from-yellow-300 hover:to-yellow-200 transition-all duration-200 animate-fade-in-up"

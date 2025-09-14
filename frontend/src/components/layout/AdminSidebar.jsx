@@ -13,7 +13,8 @@ import {
   Crown,
   ChevronLeft,
   ChevronRight,
-  Home
+  Home,
+  Bed
 } from "lucide-react"
 import { useAuth } from "../../contexts/AuthContext"
 
@@ -71,6 +72,13 @@ const AdminSidebar = () => {
       icon: Settings,
       description: "Gestion des hôtels",
       color: "from-green-500 to-green-600"
+    },
+    { 
+      name: "Chambres", 
+      href: "/admin/rooms", 
+      icon: Bed,
+      description: "Gestion des chambres",
+      color: "from-teal-500 to-teal-600"
     },
     { 
       name: "Utilisateurs", 

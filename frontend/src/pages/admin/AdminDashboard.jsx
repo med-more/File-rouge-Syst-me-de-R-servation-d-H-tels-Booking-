@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Mail,
+  Bed,
 } from "lucide-react"
 import axios from "axios"
 import { toast } from "react-toastify"
@@ -164,6 +165,13 @@ const AdminDashboard = () => {
       icon: Users,
       color: "bg-gradient-to-r from-green-500 to-green-600",
       link: "/admin/users",
+    },
+    {
+      title: "Manage Rooms",
+      description: "View and manage hotel rooms",
+      icon: Bed,
+      color: "bg-gradient-to-r from-teal-500 to-teal-600",
+      link: "/admin/rooms",
     },
     {
       title: "Payment Overview",

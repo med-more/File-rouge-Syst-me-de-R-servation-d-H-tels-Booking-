@@ -17,7 +17,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "init-users": "node scripts/initUsers.js"
+    "init-users": "node scripts/initUsers.js",
+    "generate-data": "node scripts/generateTestData.js",
+    "reset-data": "node scripts/generateTestData.js"
   },
   "devDependencies": {
     "nodemon": "^3.1.10"
